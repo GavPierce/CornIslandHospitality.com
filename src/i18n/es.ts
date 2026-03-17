@@ -1,0 +1,126 @@
+import type { Translations } from './en';
+
+const es: Translations = {
+  // Nav
+  nav: {
+    dashboard: 'Panel',
+    volunteers: 'Voluntarios',
+    planning: 'Planificación',
+    calendar: 'Calendario',
+  },
+
+  // Dashboard
+  dashboard: {
+    title: 'Panel',
+    subtitle: 'Resumen de todas las casas, habitaciones y ocupación actual',
+    totalHouses: 'Total de Casas',
+    totalCapacity: 'Capacidad Total',
+    activeAssignments: 'Asignaciones Activas',
+    registeredVolunteers: 'Voluntarios Registrados',
+    houses: 'Casas',
+    addHouse: '+ Agregar Casa',
+    cancel: 'Cancelar',
+    newHouse: 'Nueva Casa',
+    name: 'Nombre',
+    namePlaceholder: 'ej. Casa Rodríguez',
+    address: 'Dirección',
+    addressPlaceholder: '123 Av. Isla',
+    acceptedVolunteerTypes: 'Tipos de Voluntarios Aceptados',
+    createHouse: 'Crear Casa',
+    noHousesYet: 'Aún no hay casas',
+    noHousesDesc: 'Agrega tu primera casa para comenzar a gestionar alojamientos.',
+    delete: 'Eliminar',
+    bedsOccupied: 'camas ocupadas',
+    room: 'habitación',
+    rooms: 'habitaciones',
+    roomName: 'Nombre de Habitación',
+    roomNamePlaceholder: 'Habitación 1',
+    beds: 'Camas',
+    add: 'Agregar',
+    addRoom: '+ Agregar Habitación',
+  },
+
+  // Volunteers
+  volunteers: {
+    title: 'Voluntarios',
+    subtitle: 'Gestiona todos los voluntarios registrados',
+    volunteer: 'Voluntario',
+    volunteerPlural: 'Voluntarios',
+    addVolunteer: '+ Agregar Voluntario',
+    cancel: 'Cancelar',
+    newVolunteer: 'Nuevo Voluntario',
+    fullName: 'Nombre Completo',
+    fullNamePlaceholder: 'Juan Pérez',
+    type: 'Tipo',
+    selectType: 'Seleccionar tipo…',
+    emailOptional: 'Correo (opcional)',
+    emailPlaceholder: 'juan@ejemplo.com',
+    phoneOptional: 'Teléfono (opcional)',
+    phonePlaceholder: '+505 8888-1234',
+    addVolunteerBtn: 'Agregar Voluntario',
+    noVolunteers: 'No hay voluntarios registrados',
+    noVolunteersDesc: 'Agrega voluntarios para comenzar a asignarlos a habitaciones.',
+    nameCol: 'Nombre',
+    typeCol: 'Tipo',
+    contactCol: 'Contacto',
+    currentAssignment: 'Asignación Actual',
+    unassigned: 'Sin asignar',
+    delete: 'Eliminar',
+  },
+
+  // Planning
+  planning: {
+    title: 'Planificación',
+    subtitle: 'Asigna voluntarios a habitaciones disponibles',
+    newAssignment: 'Nueva Asignación',
+    volunteer: 'Voluntario',
+    selectVolunteer: 'Seleccionar voluntario…',
+    allVolunteersAssigned: 'Todos los voluntarios asignados',
+    room: 'Habitación',
+    selectRoom: 'Seleccionar habitación…',
+    startDate: 'Fecha de Inicio',
+    endDate: 'Fecha de Fin',
+    assignVolunteer: 'Asignar Voluntario',
+    currentAssignments: 'Asignaciones Actuales',
+    noHouses: 'No hay casas disponibles',
+    noHousesDesc: 'Crea casas y habitaciones en el Panel primero.',
+    noRoomsYet: 'Aún no se han agregado habitaciones.',
+    beds: 'camas',
+    unassignedVolunteers: 'Voluntarios Sin Asignar',
+    nameCol: 'Nombre',
+    typeCol: 'Tipo',
+    assignmentSuccess: '¡Asignación creada exitosamente!',
+  },
+
+  // Calendar
+  calendar: {
+    title: 'Calendario',
+    subtitle: 'Vista de línea de tiempo de todas las asignaciones',
+    prev: '← Anterior',
+    next: 'Siguiente →',
+    today: 'Hoy',
+    house: 'Casa',
+    allHouses: 'Todas las Casas',
+    noRooms: 'No hay habitaciones para mostrar',
+    noRoomsDesc: 'Agrega casas y habitaciones en el Panel primero.',
+    roomCol: 'Habitación',
+  },
+
+  // Login
+  login: {
+    title: 'Corn Island',
+    subtitle: 'Planificación de Hospitalidad',
+    passwordLabel: 'Contraseña de Administrador',
+    passwordPlaceholder: 'Ingrese la contraseña...',
+    signIn: 'Iniciar Sesión',
+  },
+
+  // Shared / Types
+  types: {
+    singleBrother: 'Hermano Soltero',
+    singleSister: 'Hermana Soltera',
+    marriedCouple: 'Matrimonio',
+  },
+};
+
+export default es;
