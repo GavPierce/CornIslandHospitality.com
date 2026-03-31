@@ -105,7 +105,7 @@ export default function HousesPdfButton({ houses }: { houses: HouseWithRooms[] }
 </head>
 <body>
     <div class="header">
-        <h1>🏠 Corn Island Hospitality — Houses Report</h1>
+        <h1>🏠 Corn Island Construction Hospitality — Houses Report</h1>
         <div class="subtitle">Complete listing of all houses, rooms, and current assignments</div>
         <div class="date">Generated: ${now}</div>
     </div>
