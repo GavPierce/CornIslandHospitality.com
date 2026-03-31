@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { Outfit } from 'next/font/google';
 import { LanguageProvider } from '@/i18n/LanguageContext';
-import SidebarClient from './SidebarClient';
+import AppShell from './AppShell';
 import './globals.css';
 
 const baseFont = Outfit({
@@ -24,14 +24,12 @@ export default function RootLayout({
     <html lang="en" className={`${baseFont.variable} ${baseFont.className}`}>
       <body>
         <LanguageProvider>
-          <div className="app-shell">
-            <SidebarClient />
-            <main className="main-content">
-              {children}
-            </main>
-          </div>
+          <AppShell>
+            {children}
+          </AppShell>
         </LanguageProvider>
       </body>
     </html>
   );
 }
+

@@ -10,8 +10,8 @@ type Room = {
     capacity: number;
     assignments: {
         id: string;
-        startDate: string;
-        endDate: string;
+        startDate: Date;
+        endDate: Date;
         volunteer: { id: string; name: string; type: string };
     }[];
 };

@@ -4,13 +4,16 @@ export type Translations = {
     volunteers: string;
     planning: string;
     calendar: string;
+    logout: string;
   };
   dashboard: {
     title: string;
     subtitle: string;
     totalHouses: string;
-    totalCapacity: string;
+    totalBeds: string;
+    maxCapacity: string;
     activeAssignments: string;
+    downloadPdf: string;
     registeredVolunteers: string;
     houses: string;
     addHouse: string;
@@ -114,14 +117,17 @@ const en: Translations = {
     volunteers: 'Volunteers',
     planning: 'Planning',
     calendar: 'Calendar',
+    logout: 'Logout',
   },
   dashboard: {
     title: 'Dashboard',
     subtitle: 'Overview of all houses, rooms, and current occupancy',
     totalHouses: 'Total Houses',
-    totalCapacity: 'Total Capacity',
+    totalBeds: 'Total Beds',
+    maxCapacity: 'Max Capacity',
     activeAssignments: 'Active Assignments',
     registeredVolunteers: 'Registered Volunteers',
+    downloadPdf: 'Download PDF',
     houses: 'Houses',
     addHouse: '+ Add House',
     cancel: 'Cancel',

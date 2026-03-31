@@ -7,6 +7,7 @@ const es: Translations = {
     volunteers: 'Voluntarios',
     planning: 'Planificación',
     calendar: 'Calendario',
+    logout: 'Cerrar Sesión',
   },
 
   // Dashboard
@@ -14,9 +15,11 @@ const es: Translations = {
     title: 'Panel',
     subtitle: 'Resumen de todas las casas, habitaciones y ocupación actual',
     totalHouses: 'Total de Casas',
-    totalCapacity: 'Capacidad Total',
+    totalBeds: 'Total de Camas',
+    maxCapacity: 'Capacidad Máxima',
     activeAssignments: 'Asignaciones Activas',
     registeredVolunteers: 'Voluntarios Registrados',
+    downloadPdf: 'Descargar PDF',
     houses: 'Casas',
     addHouse: '+ Agregar Casa',
     cancel: 'Cancelar',

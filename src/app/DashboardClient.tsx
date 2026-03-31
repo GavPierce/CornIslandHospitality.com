@@ -3,6 +3,7 @@
 import { createHouse, createRoom, deleteHouse, deleteRoom } from '@/actions/housing';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { useState } from 'react';
+import HousesPdfButton from './HousesPdfButton';
 
 type HouseWithRooms = {
     id: string;
@@ -33,12 +34,14 @@ export default function DashboardClient({
     houses,
     volunteerCount,
     activeAssignments,
-    totalCapacity,
+    totalBeds,
+    maxCapacity,
 }: {
     houses: HouseWithRooms[];
     volunteerCount: number;
     activeAssignments: number;
-    totalCapacity: number;
+    totalBeds: number;
+    maxCapacity: number;
 }) {
     const { t } = useTranslation();
     const [showHouseForm, setShowHouseForm] = useState(false);
@@ -81,12 +84,16 @@ export default function DashboardClient({
                     <span className="stat-value accent">{houses.length}</span>
                 </div>
                 <div className="glass-panel stat-card">
-                    <span className="stat-label">{t.dashboard.totalCapacity}</span>
-                    <span className="stat-value">{totalCapacity}</span>
+                    <span className="stat-label">{t.dashboard.totalBeds}</span>
+                    <span className="stat-value">{totalBeds}</span>
+                </div>
+                <div className="glass-panel stat-card">
+                    <span className="stat-label">{t.dashboard.maxCapacity}</span>
+                    <span className="stat-value accent">{maxCapacity}</span>
                 </div>
                 <div className="glass-panel stat-card">
                     <span className="stat-label">{t.dashboard.activeAssignments}</span>
-                    <span className="stat-value accent">{activeAssignments}</span>
+                    <span className="stat-value">{activeAssignments}</span>
                 </div>
                 <div className="glass-panel stat-card">
                     <span className="stat-label">{t.dashboard.registeredVolunteers}</span>
@@ -100,9 +107,12 @@ export default function DashboardClient({
             <div className="section">
                 <div className="section-header">
                     <h2>{t.dashboard.houses}</h2>
-                    <button className="btn btn-primary" onClick={() => setShowHouseForm(!showHouseForm)}>
-                        {showHouseForm ? t.dashboard.cancel : t.dashboard.addHouse}
-                    </button>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <HousesPdfButton houses={houses} />
+                        <button className="btn btn-primary" onClick={() => setShowHouseForm(!showHouseForm)}>
+                            {showHouseForm ? t.dashboard.cancel : t.dashboard.addHouse}
+                        </button>
+                    </div>
                 </div>
 
                 {showHouseForm && (

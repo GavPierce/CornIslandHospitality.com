@@ -12,8 +12,8 @@ type VolunteerWithAssignments = {
     type: string;
     assignments: {
         id: string;
-        startDate: string;
-        endDate: string;
+        startDate: Date;
+        endDate: Date;
         room: {
             name: string;
             house: { name: string };

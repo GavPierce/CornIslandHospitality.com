@@ -9,9 +9,17 @@ export default async function DashboardPage() {
     where: { endDate: { gte: new Date() } },
   });
 
-  const totalCapacity = houses.reduce(
+  const totalBeds = houses.reduce(
     (sum: number, h: { rooms: { capacity: number }[] }) =>
       sum + h.rooms.reduce((rs: number, r: { capacity: number }) => rs + r.capacity, 0),
+    0
+  );
+
+  const maxCapacity = houses.reduce(
+    (sum: number, h: { rooms: { capacity: number }[]; acceptedTypes: string[] }) => {
+      const multiplier = h.acceptedTypes.includes('MARRIED_COUPLE') ? 2 : 1;
+      return sum + h.rooms.reduce((rs: number, r: { capacity: number }) => rs + r.capacity * multiplier, 0);
+    },
     0
   );
 
@@ -20,7 +28,8 @@ export default async function DashboardPage() {
       houses={houses}
       volunteerCount={volunteerCount}
       activeAssignments={assignmentCount}
-      totalCapacity={totalCapacity}
+      totalBeds={totalBeds}
+      maxCapacity={maxCapacity}
     />
   );
 }
