@@ -1,6 +1,7 @@
 'use client';
 
 import { createVolunteer, deleteVolunteer } from '@/actions/housing';
+import type { UserRole } from '@/lib/auth';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { useState } from 'react';
 
@@ -32,9 +33,12 @@ function typeBadgeClass(type: string) {
 
 export default function VolunteersClient({
     volunteers,
+    role,
 }: {
     volunteers: VolunteerWithAssignments[];
+    role: UserRole;
 }) {
+    const isAdmin = role === 'admin';
     const { t } = useTranslation();
     const [showForm, setShowForm] = useState(false);
     const [error, setError] = useState('');
@@ -67,12 +71,14 @@ export default function VolunteersClient({
             <div className="section">
                 <div className="section-header">
                     <h2>{volunteers.length} {volunteers.length !== 1 ? t.volunteers.volunteerPlural : t.volunteers.volunteer}</h2>
-                    <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
-                        {showForm ? t.volunteers.cancel : t.volunteers.addVolunteer}
-                    </button>
+                    {isAdmin && (
+                        <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
+                            {showForm ? t.volunteers.cancel : t.volunteers.addVolunteer}
+                        </button>
+                    )}
                 </div>
 
-                {showForm && (
+                {isAdmin && showForm && (
                     <div className="glass-panel form-card">
                         <h3>{t.volunteers.newVolunteer}</h3>
                         <form action={handleCreate}>
@@ -121,7 +127,7 @@ export default function VolunteersClient({
                                     <th>{t.volunteers.typeCol}</th>
                                     <th>{t.volunteers.contactCol}</th>
                                     <th>{t.volunteers.currentAssignment}</th>
-                                    <th></th>
+                                    {isAdmin && <th></th>}
                                 </tr>
                             </thead>
                             <tbody>
@@ -147,14 +153,16 @@ export default function VolunteersClient({
                                                     <span style={{ color: 'var(--warning)' }}>{t.volunteers.unassigned}</span>
                                                 )}
                                             </td>
-                                            <td>
-                                                <button
-                                                    className="btn btn-danger btn-sm"
-                                                    onClick={() => deleteVolunteer(v.id)}
-                                                >
-                                                    {t.volunteers.delete}
-                                                </button>
-                                            </td>
+                                            {isAdmin && (
+                                                <td>
+                                                    <button
+                                                        className="btn btn-danger btn-sm"
+                                                        onClick={() => deleteVolunteer(v.id)}
+                                                    >
+                                                        {t.volunteers.delete}
+                                                    </button>
+                                                </td>
+                                            )}
                                         </tr>
                                     );
                                 })}

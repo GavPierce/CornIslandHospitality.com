@@ -1,5 +1,6 @@
 'use server';
 
+import { requireAdmin } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { VolunteerType } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
@@ -25,6 +26,9 @@ export async function getHouses() {
 }
 
 export async function createHouse(formData: FormData) {
+    const authError = await requireAdmin();
+    if (authError) return { error: authError };
+
     const name = formData.get('name') as string;
     const address = formData.get('address') as string;
     const acceptedTypes = formData.getAll('acceptedTypes') as VolunteerType[];
@@ -43,6 +47,9 @@ export async function createHouse(formData: FormData) {
 }
 
 export async function deleteHouse(id: string) {
+    const authError = await requireAdmin();
+    if (authError) return { error: authError };
+
     await prisma.house.delete({ where: { id } });
     revalidatePath('/');
     revalidatePath('/planning');
@@ -52,6 +59,9 @@ export async function deleteHouse(id: string) {
 // ─── Rooms ───────────────────────────────────────────
 
 export async function createRoom(formData: FormData) {
+    const authError = await requireAdmin();
+    if (authError) return { error: authError };
+
     const name = formData.get('name') as string;
     const capacity = parseInt(formData.get('capacity') as string, 10);
     const houseId = formData.get('houseId') as string;
@@ -70,6 +80,9 @@ export async function createRoom(formData: FormData) {
 }
 
 export async function deleteRoom(id: string) {
+    const authError = await requireAdmin();
+    if (authError) return { error: authError };
+
     await prisma.room.delete({ where: { id } });
     revalidatePath('/');
     revalidatePath('/planning');
@@ -91,6 +104,9 @@ export async function getVolunteers() {
 }
 
 export async function createVolunteer(formData: FormData) {
+    const authError = await requireAdmin();
+    if (authError) return { error: authError };
+
     const name = formData.get('name') as string;
     const email = (formData.get('email') as string) || null;
     const phone = (formData.get('phone') as string) || null;
@@ -110,6 +126,9 @@ export async function createVolunteer(formData: FormData) {
 }
 
 export async function deleteVolunteer(id: string) {
+    const authError = await requireAdmin();
+    if (authError) return { error: authError };
+
     await prisma.volunteer.delete({ where: { id } });
     revalidatePath('/volunteers');
     revalidatePath('/planning');
@@ -119,6 +138,9 @@ export async function deleteVolunteer(id: string) {
 // ─── Assignments ─────────────────────────────────────
 
 export async function createAssignment(formData: FormData) {
+    const authError = await requireAdmin();
+    if (authError) return { error: authError };
+
     const volunteerId = formData.get('volunteerId') as string;
     const roomId = formData.get('roomId') as string;
     const startDate = new Date(formData.get('startDate') as string);
@@ -180,6 +202,9 @@ export async function createAssignment(formData: FormData) {
 }
 
 export async function deleteAssignment(id: string) {
+    const authError = await requireAdmin();
+    if (authError) return { error: authError };
+
     await prisma.assignment.delete({ where: { id } });
     revalidatePath('/');
     revalidatePath('/planning');

@@ -1,6 +1,7 @@
 'use client';
 
 import { createAssignment, deleteAssignment } from '@/actions/housing';
+import type { UserRole } from '@/lib/auth';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { useState } from 'react';
 
@@ -46,10 +47,13 @@ function typeBadgeClass(type: string) {
 export default function PlanningClient({
     houses,
     volunteers,
+    role,
 }: {
     houses: House[];
     volunteers: Volunteer[];
+    role: UserRole;
 }) {
+    const isAdmin = role === 'admin';
     const { t } = useTranslation();
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
@@ -93,6 +97,7 @@ export default function PlanningClient({
             {success && <div className="alert alert-success">{success}</div>}
 
             {/* Assignment Form */}
+            {isAdmin && (
             <div className="glass-panel form-card">
                 <h3>{t.planning.newAssignment}</h3>
                 <form action={handleAssign}>
@@ -136,6 +141,7 @@ export default function PlanningClient({
                     <button type="submit" className="btn btn-primary">{t.planning.assignVolunteer}</button>
                 </form>
             </div>
+            )}
 
             {/* Current Assignments by House */}
             <div className="section">
@@ -198,17 +204,24 @@ export default function PlanningClient({
                                                                 {typeLabel(a.volunteer.type)}
                                                             </span>
                                                         </div>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                        {isAdmin && (
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                                <span style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem' }}>
+                                                                    {new Date(a.startDate).toLocaleDateString()} – {new Date(a.endDate).toLocaleDateString()}
+                                                                </span>
+                                                                <button
+                                                                    className="btn btn-danger btn-sm"
+                                                                    onClick={() => deleteAssignment(a.id)}
+                                                                >
+                                                                    ✕
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                        {!isAdmin && (
                                                             <span style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem' }}>
                                                                 {new Date(a.startDate).toLocaleDateString()} – {new Date(a.endDate).toLocaleDateString()}
                                                             </span>
-                                                            <button
-                                                                className="btn btn-danger btn-sm"
-                                                                onClick={() => deleteAssignment(a.id)}
-                                                            >
-                                                                ✕
-                                                            </button>
-                                                        </div>
+                                                        )}
                                                     </div>
                                                 ))}
                                             </div>

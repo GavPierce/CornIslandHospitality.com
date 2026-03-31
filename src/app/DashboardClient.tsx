@@ -1,6 +1,7 @@
 'use client';
 
 import { createHouse, createRoom, deleteHouse, deleteRoom } from '@/actions/housing';
+import type { UserRole } from '@/lib/auth';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { useState } from 'react';
 import HousesPdfButton from './HousesPdfButton';
@@ -36,13 +37,16 @@ export default function DashboardClient({
     activeAssignments,
     totalBeds,
     maxCapacity,
+    role,
 }: {
     houses: HouseWithRooms[];
     volunteerCount: number;
     activeAssignments: number;
     totalBeds: number;
     maxCapacity: number;
+    role: UserRole;
 }) {
+    const isAdmin = role === 'admin';
     const { t } = useTranslation();
     const [showHouseForm, setShowHouseForm] = useState(false);
     const [expandedHouse, setExpandedHouse] = useState<string | null>(null);
@@ -109,13 +113,15 @@ export default function DashboardClient({
                     <h2>{t.dashboard.houses}</h2>
                     <div style={{ display: 'flex', gap: 8 }}>
                         <HousesPdfButton houses={houses} />
-                        <button className="btn btn-primary" onClick={() => setShowHouseForm(!showHouseForm)}>
-                            {showHouseForm ? t.dashboard.cancel : t.dashboard.addHouse}
-                        </button>
+                        {isAdmin && (
+                            <button className="btn btn-primary" onClick={() => setShowHouseForm(!showHouseForm)}>
+                                {showHouseForm ? t.dashboard.cancel : t.dashboard.addHouse}
+                            </button>
+                        )}
                     </div>
                 </div>
 
-                {showHouseForm && (
+                {isAdmin && showHouseForm && (
                     <div className="glass-panel form-card">
                         <h3>{t.dashboard.newHouse}</h3>
                         <form action={handleCreateHouse}>
@@ -172,12 +178,14 @@ export default function DashboardClient({
                                             <h3>{house.name}</h3>
                                             <div className="address">{house.address}</div>
                                         </div>
-                                        <button
-                                            className="btn btn-danger btn-sm"
-                                            onClick={() => deleteHouse(house.id)}
-                                        >
-                                            {t.dashboard.delete}
-                                        </button>
+                                        {isAdmin && (
+                                            <button
+                                                className="btn btn-danger btn-sm"
+                                                onClick={() => deleteHouse(house.id)}
+                                            >
+                                                {t.dashboard.delete}
+                                            </button>
+                                        )}
                                     </div>
 
                                     <div className="accepted-types">
@@ -214,13 +222,15 @@ export default function DashboardClient({
                                                         <div className="occupancy-bar">
                                                             <div className={`fill ${fillClass}`} style={{ width: `${Math.min(pct, 100)}%` }} />
                                                         </div>
-                                                        <button
-                                                            className="btn btn-danger btn-sm"
-                                                            style={{ marginLeft: 8 }}
-                                                            onClick={() => deleteRoom(room.id)}
-                                                        >
-                                                            ✕
-                                                        </button>
+                                                        {isAdmin && (
+                                                            <button
+                                                                className="btn btn-danger btn-sm"
+                                                                style={{ marginLeft: 8 }}
+                                                                onClick={() => deleteRoom(room.id)}
+                                                            >
+                                                                ✕
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
                                             );
@@ -228,31 +238,33 @@ export default function DashboardClient({
                                     </div>
 
                                     {/* Add Room form */}
-                                    <div style={{ marginTop: 12 }}>
-                                        {isExpanded ? (
-                                            <form action={handleCreateRoom} style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-                                                <input type="hidden" name="houseId" value={house.id} />
-                                                <div className="form-group" style={{ flex: 1, minWidth: 0 }}>
-                                                    <label>{t.dashboard.roomName}</label>
-                                                    <input name="name" placeholder={t.dashboard.roomNamePlaceholder} required style={{ padding: '8px 10px', fontSize: '0.825rem' }} />
-                                                </div>
-                                                <div className="form-group" style={{ width: 80 }}>
-                                                    <label>{t.dashboard.beds}</label>
-                                                    <input name="capacity" type="number" min="1" defaultValue="1" required style={{ padding: '8px 10px', fontSize: '0.825rem' }} />
-                                                </div>
-                                                <button type="submit" className="btn btn-primary btn-sm">{t.dashboard.add}</button>
-                                                <button type="button" className="btn btn-danger btn-sm" onClick={() => setExpandedHouse(null)}>✕</button>
-                                            </form>
-                                        ) : (
-                                            <button
-                                                className="btn btn-primary btn-sm"
-                                                style={{ width: '100%' }}
-                                                onClick={() => setExpandedHouse(house.id)}
-                                            >
-                                                {t.dashboard.addRoom}
-                                            </button>
-                                        )}
-                                    </div>
+                                    {isAdmin && (
+                                        <div style={{ marginTop: 12 }}>
+                                            {isExpanded ? (
+                                                <form action={handleCreateRoom} style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                                                    <input type="hidden" name="houseId" value={house.id} />
+                                                    <div className="form-group" style={{ flex: 1, minWidth: 0 }}>
+                                                        <label>{t.dashboard.roomName}</label>
+                                                        <input name="name" placeholder={t.dashboard.roomNamePlaceholder} required style={{ padding: '8px 10px', fontSize: '0.825rem' }} />
+                                                    </div>
+                                                    <div className="form-group" style={{ width: 80 }}>
+                                                        <label>{t.dashboard.beds}</label>
+                                                        <input name="capacity" type="number" min="1" defaultValue="1" required style={{ padding: '8px 10px', fontSize: '0.825rem' }} />
+                                                    </div>
+                                                    <button type="submit" className="btn btn-primary btn-sm">{t.dashboard.add}</button>
+                                                    <button type="button" className="btn btn-danger btn-sm" onClick={() => setExpandedHouse(null)}>✕</button>
+                                                </form>
+                                            ) : (
+                                                <button
+                                                    className="btn btn-primary btn-sm"
+                                                    style={{ width: '100%' }}
+                                                    onClick={() => setExpandedHouse(house.id)}
+                                                >
+                                                    {t.dashboard.addRoom}
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })}

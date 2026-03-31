@@ -1,4 +1,5 @@
 import { getHouses } from '@/actions/housing';
+import { getUserRole } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import DashboardClient from './DashboardClient';
 
@@ -10,6 +11,7 @@ export default async function DashboardPage() {
   const assignmentCount = await prisma.assignment.count({
     where: { endDate: { gte: new Date() } },
   });
+  const role = await getUserRole();
 
   const totalBeds = houses.reduce(
     (sum: number, h: { rooms: { capacity: number }[] }) =>
@@ -32,6 +34,7 @@ export default async function DashboardPage() {
       activeAssignments={assignmentCount}
       totalBeds={totalBeds}
       maxCapacity={maxCapacity}
+      role={role}
     />
   );
 }
