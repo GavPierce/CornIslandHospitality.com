@@ -2,6 +2,8 @@ import { getHouses } from '@/actions/housing';
 import { prisma } from '@/lib/prisma';
 import DashboardClient from './DashboardClient';
 
+export const dynamic = 'force-dynamic';
+
 export default async function DashboardPage() {
   const houses = await getHouses();
   const volunteerCount = await prisma.volunteer.count();
