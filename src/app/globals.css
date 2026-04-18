@@ -930,3 +930,132 @@ h6 {
     padding: 8px;
   }
 }
+
+/* ─── Night Watchman Calendar ────────────────── */
+.wm-calendar {
+  padding: 16px;
+}
+
+.wm-weekday-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.wm-weekday {
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  padding: 6px 0;
+}
+
+.wm-day-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.wm-day {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  min-height: 92px;
+  padding: 6px 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.wm-day:hover:not(.wm-day-blank) {
+  background: var(--bg-tertiary);
+  border-color: var(--border-glow);
+}
+
+.wm-day-blank {
+  background: transparent;
+  border-color: transparent;
+  cursor: default;
+  min-height: 92px;
+}
+
+.wm-day.is-today {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 1px var(--accent-glow);
+}
+
+.wm-day.is-selected {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: var(--accent-secondary);
+}
+
+.wm-day-num {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.wm-day.is-today .wm-day-num {
+  color: var(--accent-secondary);
+}
+
+.wm-day-shifts {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow: hidden;
+}
+
+.wm-shift-pill {
+  display: block;
+  background: rgba(139, 92, 246, 0.22);
+  border-left: 3px solid #8b5cf6;
+  color: var(--text-primary);
+  padding: 2px 6px;
+  font-size: 0.72rem;
+  border-radius: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wm-shift-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+}
+
+.wm-shift-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+}
+
+@media (max-width: 768px) {
+  .wm-day {
+    min-height: 72px;
+    padding: 4px 5px;
+  }
+
+  .wm-shift-pill {
+    font-size: 0.65rem;
+    padding: 1px 4px;
+  }
+}

@@ -4,6 +4,7 @@ export type Translations = {
     volunteers: string;
     planning: string;
     calendar: string;
+    watchman: string;
     logout: string;
   };
   dashboard: {
@@ -104,6 +105,36 @@ export type Translations = {
     passwordPlaceholder: string;
     signIn: string;
   };
+  watchman: {
+    title: string;
+    subtitle: string;
+    watchman: string;
+    watchmanPlural: string;
+    addWatchman: string;
+    cancel: string;
+    newWatchman: string;
+    fullName: string;
+    fullNamePlaceholder: string;
+    emailOptional: string;
+    emailPlaceholder: string;
+    phoneOptional: string;
+    phonePlaceholder: string;
+    addWatchmanBtn: string;
+    noWatchmen: string;
+    noWatchmenDesc: string;
+    nameCol: string;
+    contactCol: string;
+    delete: string;
+    schedule: string;
+    nightOf: string;
+    scheduled: string;
+    selectWatchman: string;
+    notesOptional: string;
+    notesPlaceholder: string;
+    assignForNight: string;
+    remove: string;
+    addSomeoneFirst: string;
+  };
   types: {
     singleBrother: string;
     singleSister: string;
@@ -117,6 +148,7 @@ const en: Translations = {
     volunteers: 'Volunteers',
     planning: 'Planning',
     calendar: 'Calendar',
+    watchman: 'Night Watchman',
     logout: 'Logout',
   },
   dashboard: {
@@ -216,6 +248,36 @@ const en: Translations = {
     passwordLabel: 'Administrator Password',
     passwordPlaceholder: 'Enter password...',
     signIn: 'Sign In',
+  },
+  watchman: {
+    title: 'Night Watchman',
+    subtitle: 'Manage watchmen and schedule who is on duty each night',
+    watchman: 'Watchman',
+    watchmanPlural: 'Watchmen',
+    addWatchman: '+ Add Watchman',
+    cancel: 'Cancel',
+    newWatchman: 'New Watchman',
+    fullName: 'Full Name',
+    fullNamePlaceholder: 'John Smith',
+    emailOptional: 'Email (optional)',
+    emailPlaceholder: 'john@example.com',
+    phoneOptional: 'Phone (optional)',
+    phonePlaceholder: '+1 555-1234',
+    addWatchmanBtn: 'Add Watchman',
+    noWatchmen: 'No watchmen registered',
+    noWatchmenDesc: 'Add people signed up for night watchman duty to schedule them.',
+    nameCol: 'Name',
+    contactCol: 'Contact',
+    delete: 'Delete',
+    schedule: 'Schedule',
+    nightOf: 'Night of',
+    scheduled: 'Scheduled',
+    selectWatchman: 'Select watchman…',
+    notesOptional: 'Notes (optional)',
+    notesPlaceholder: 'e.g. backup for second half',
+    assignForNight: 'Assign for this night',
+    remove: 'Remove',
+    addSomeoneFirst: 'Add a watchman first, then assign them to nights.',
   },
   types: {
     singleBrother: 'Single Brother',

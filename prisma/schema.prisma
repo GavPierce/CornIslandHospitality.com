@@ -60,3 +60,26 @@ model Assignment {
   @@index([roomId])
   @@index([volunteerId])
 }
+
+model Watchman {
+  id          String          @id @default(cuid())
+  name        String
+  email       String?
+  phone       String?
+  shifts      WatchmanShift[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model WatchmanShift {
+  id          String   @id @default(cuid())
+  watchmanId  String
+  watchman    Watchman @relation(fields: [watchmanId], references: [id], onDelete: Cascade)
+  date        DateTime // The night being worked (stored at 00:00 UTC)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([watchmanId, date])
+  @@index([date])
+}
