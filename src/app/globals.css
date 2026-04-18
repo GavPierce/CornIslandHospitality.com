@@ -618,8 +618,12 @@ h6 {
 /* ─── Mobile Header (hamburger bar) ──────────── */
 .mobile-header {
   display: none;
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 56px;
   z-index: 90;
   align-items: center;
   gap: 12px;
@@ -692,9 +696,13 @@ h6 {
     transform: translateX(0);
   }
 
+  .app-shell {
+    display: block;
+  }
+
   .main-content {
     margin-left: 0;
-    padding: 16px 14px 32px;
+    padding: 72px 14px 32px;
   }
 
   .page-header {
@@ -790,7 +798,7 @@ h6 {
   }
 
   .main-content {
-    padding: 14px 12px 28px;
+    padding: 68px 12px 28px;
   }
 
   .house-card-header {
