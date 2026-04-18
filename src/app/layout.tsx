@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Outfit } from 'next/font/google';
 import { LanguageProvider } from '@/i18n/LanguageContext';
 import AppShell from './AppShell';
@@ -13,6 +13,12 @@ const baseFont = Outfit({
 export const metadata: Metadata = {
   title: 'Corn Island Hospitality',
   description: 'Manage volunteers and hospitality capacity for the Corn Island project.',
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
 };
 
 export default function RootLayout({

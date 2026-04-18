@@ -1,13 +1,60 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { useTranslation } from '@/i18n/LanguageContext';
 
 export default function SidebarClient() {
     const { locale, setLocale, t } = useTranslation();
+    const pathname = usePathname();
+    const [open, setOpen] = useState(false);
+
+    // Close drawer on route change
+    useEffect(() => {
+        setOpen(false);
+    }, [pathname]);
+
+    // Prevent body scroll when drawer open on mobile
+    useEffect(() => {
+        if (open) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+        return () => {
+            document.body.style.overflow = '';
+        };
+    }, [open]);
 
     return (
-        <aside className="sidebar">
+        <>
+            {/* Mobile top bar with hamburger */}
+            <header className="mobile-header">
+                <button
+                    type="button"
+                    className="mobile-menu-btn"
+                    aria-label="Open menu"
+                    aria-expanded={open}
+                    onClick={() => setOpen(true)}
+                >
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
+                </button>
+                <div className="mobile-header-brand">
+                    <span className="sidebar-logo">🏠</span>
+                    <h2>Corn Island</h2>
+                </div>
+            </header>
+
+            {open && (
+                <div
+                    className="sidebar-backdrop"
+                    onClick={() => setOpen(false)}
+                    aria-hidden="true"
+                />
+            )}
+
+            <aside className={`sidebar ${open ? 'is-open' : ''}`}>
             <div className="sidebar-brand">
                 <span className="sidebar-logo">🏠</span>
                 <h2>Corn Island</h2>
@@ -56,6 +103,7 @@ export default function SidebarClient() {
                     <span className="lang-label">ES</span>
                 </button>
             </div>
-        </aside>
+            </aside>
+        </>
     );
 }

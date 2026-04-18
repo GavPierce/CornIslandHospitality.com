@@ -189,6 +189,8 @@ export default function PlanningClient({
                                                             display: 'flex',
                                                             justifyContent: 'space-between',
                                                             alignItems: 'center',
+                                                            gap: 8,
+                                                            flexWrap: 'wrap',
                                                             padding: '6px 12px',
                                                             background: 'var(--bg-primary)',
                                                             borderRadius: 'var(--radius-sm)',

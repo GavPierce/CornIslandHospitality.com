@@ -241,7 +241,7 @@ export default function DashboardClient({
                                     {isAdmin && (
                                         <div style={{ marginTop: 12 }}>
                                             {isExpanded ? (
-                                                <form action={handleCreateRoom} style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                                                <form action={handleCreateRoom} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
                                                     <input type="hidden" name="houseId" value={house.id} />
                                                     <div className="form-group" style={{ flex: 1, minWidth: 0 }}>
                                                         <label>{t.dashboard.roomName}</label>
