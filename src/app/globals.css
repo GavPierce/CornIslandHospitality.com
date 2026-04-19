@@ -1104,6 +1104,10 @@ h6 {
 /* ─── Night Watchman Calendar ────────────────── */
 .wm-calendar {
   padding: 16px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .wm-weekday-row {
@@ -1328,13 +1332,72 @@ h6 {
 }
 
 @media (max-width: 768px) {
-  .wm-day {
-    min-height: 72px;
-    padding: 4px 5px;
+  .wm-calendar {
+    padding: 8px;
   }
 
+  .wm-weekday-row,
+  .wm-day-grid {
+    gap: 3px;
+  }
+
+  .wm-weekday {
+    font-size: 0.6rem;
+    padding: 4px 0;
+    letter-spacing: 0.02em;
+  }
+
+  .wm-day,
+  .wm-day-blank {
+    min-height: 64px;
+    padding: 3px 2px;
+  }
+
+  .wm-day-num {
+    font-size: 0.75rem;
+    margin-bottom: 2px;
+    text-align: center;
+  }
+
+  .wm-day-shifts {
+    gap: 2px;
+  }
+
+  /* Compact pills: show only the slot initial + count on mobile */
   .wm-shift-pill {
-    font-size: 0.65rem;
-    padding: 1px 4px;
+    font-size: 0.55rem;
+    padding: 1px 3px;
+    border-left-width: 2px;
+    gap: 2px;
+    justify-content: center;
+  }
+
+  .wm-shift-pill .wm-pill-slot {
+    gap: 2px;
+  }
+
+  .wm-shift-pill .wm-pill-slot > :first-child {
+    /* Hide full slot label on mobile, keep only the count badge */
+    display: none;
+  }
+
+  .wm-shift-pill .wm-pill-name {
+    display: none;
+  }
+
+  .wm-pill-count {
+    font-size: 0.55rem;
+    padding: 0 3px;
+  }
+}
+
+@media (max-width: 480px) {
+  .wm-day,
+  .wm-day-blank {
+    min-height: 56px;
+  }
+
+  .wm-day-num {
+    font-size: 0.7rem;
   }
 }
