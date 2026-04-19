@@ -146,9 +146,20 @@ const es: Translations = {
     selectWatchman: 'Seleccionar vigilante…',
     notesOptional: 'Notas (opcional)',
     notesPlaceholder: 'ej. refuerzo para la segunda mitad',
-    assignForNight: 'Asignar para esta noche',
+    assignForNight: 'Asignar turno',
     remove: 'Quitar',
-    addSomeoneFirst: 'Agrega un vigilante primero para poder asignarlo a las noches.',
+    addSomeoneFirst: 'Agrega un vigilante primero para poder asignarlo a los turnos.',
+    shift: 'Turno',
+    unfilled: 'Sin cubrir',
+    allSlotsFilled: 'Todos los turnos están cubiertos para este día.',
+    needMore: 'faltan',
+    staffed: 'cubierto',
+    slots: {
+      morning: 'Mañana',
+      afternoon: 'Tarde',
+      evening: 'Noche',
+      overnight: 'Madrugada',
+    },
   },
 
   // Shared / Types

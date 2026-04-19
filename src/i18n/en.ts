@@ -134,6 +134,17 @@ export type Translations = {
     assignForNight: string;
     remove: string;
     addSomeoneFirst: string;
+    shift: string;
+    unfilled: string;
+    allSlotsFilled: string;
+    needMore: string;
+    staffed: string;
+    slots: {
+      morning: string;
+      afternoon: string;
+      evening: string;
+      overnight: string;
+    };
   };
   types: {
     singleBrother: string;
@@ -275,9 +286,20 @@ const en: Translations = {
     selectWatchman: 'Select watchman…',
     notesOptional: 'Notes (optional)',
     notesPlaceholder: 'e.g. backup for second half',
-    assignForNight: 'Assign for this night',
+    assignForNight: 'Assign shift',
     remove: 'Remove',
-    addSomeoneFirst: 'Add a watchman first, then assign them to nights.',
+    addSomeoneFirst: 'Add a watchman first, then assign them to shifts.',
+    shift: 'Shift',
+    unfilled: 'Unfilled',
+    allSlotsFilled: 'All shifts are filled for this day.',
+    needMore: 'needs more',
+    staffed: 'staffed',
+    slots: {
+      morning: 'Morning',
+      afternoon: 'Afternoon',
+      evening: 'Evening',
+      overnight: 'Overnight',
+    },
   },
   types: {
     singleBrother: 'Single Brother',

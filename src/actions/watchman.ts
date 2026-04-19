@@ -2,6 +2,8 @@
 
 import { requireAdmin } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { allowedSlotsForWeekday } from '@/lib/watchman';
+import { ShiftSlot } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 
 // ─── Watchmen (People) ──────────────────────────────────
@@ -71,27 +73,41 @@ export async function createWatchmanShift(formData: FormData) {
 
     const watchmanId = formData.get('watchmanId') as string;
     const dateStr = formData.get('date') as string;
+    const slotStr = formData.get('slot') as string;
     const notes = ((formData.get('notes') as string) || '').trim() || null;
 
-    if (!watchmanId || !dateStr) {
-        return { error: 'Watchman and date are required.' };
+    if (!watchmanId || !dateStr || !slotStr) {
+        return { error: 'Watchman, date, and shift are required.' };
     }
 
     const date = parseDateOnly(dateStr);
     if (!date) return { error: 'Invalid date.' };
 
+    // Validate slot value
+    const validSlots: ShiftSlot[] = ['EVENING', 'OVERNIGHT', 'MORNING', 'AFTERNOON'] as ShiftSlot[];
+    if (!validSlots.includes(slotStr as ShiftSlot)) {
+        return { error: 'Invalid shift.' };
+    }
+    const slot = slotStr as ShiftSlot;
+
+    // Validate that this slot is allowed on this weekday
+    const weekday = date.getUTCDay();
+    if (!allowedSlotsForWeekday(weekday).includes(slot)) {
+        return { error: 'That shift is not available on this day.' };
+    }
+
     const watchman = await prisma.watchman.findUnique({ where: { id: watchmanId } });
     if (!watchman) return { error: 'Watchman not found.' };
 
-    // Prevent duplicate assignment for same watchman on same night
+    // Prevent the same watchman from being double-assigned to the same shift
     const existing = await prisma.watchmanShift.findUnique({
-        where: { watchmanId_date: { watchmanId, date } },
+        where: { watchmanId_date_slot: { watchmanId, date, slot } },
     });
     if (existing) {
-        return { error: 'This watchman is already scheduled for that night.' };
+        return { error: 'This watchman is already assigned to that shift.' };
     }
 
-    await prisma.watchmanShift.create({ data: { watchmanId, date, notes } });
+    await prisma.watchmanShift.create({ data: { watchmanId, date, slot, notes } });
 
     revalidatePath('/watchman');
     return { success: true };
