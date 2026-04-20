@@ -10,11 +10,14 @@ import {
 import type { UserRole } from '@/lib/auth';
 import { useTranslation } from '@/i18n/LanguageContext';
 import {
+    SHIFT_SLOT_ORDER,
     SHIFT_SLOT_TIMES,
     allowedSlotsForWeekday,
+    displaySlotsForDay,
 } from '@/lib/watchman';
 import type { ShiftSlot } from '@prisma/client';
 import { useEffect, useState, useTransition } from 'react';
+import WatchmanPdfButton from './WatchmanPdfButton';
 
 type Watchman = {
     id: string;
@@ -212,8 +215,22 @@ export default function WatchmanClient({
         selectedDay !== null
             ? new Date(Date.UTC(year, month, selectedDay)).getUTCDay()
             : -1;
-    const selectedAllowedSlots =
-        selectedWeekday >= 0 ? allowedSlotsForWeekday(selectedWeekday) : [];
+    // Slots rendered in the "Scheduled" list for the selected day: defaults
+    // for that weekday plus any extra slots the admin has already filled in.
+    const selectedDisplaySlots =
+        selectedWeekday >= 0
+            ? displaySlotsForDay(
+                  selectedWeekday,
+                  selectedShifts.map((s) => s.slot),
+              )
+            : [];
+    // Slots the admin may assign on the selected day. Admins can add any of
+    // the four shifts to any day of the week.
+    const selectedAssignableSlots: ShiftSlot[] = isAdmin
+        ? SHIFT_SLOT_ORDER
+        : selectedWeekday >= 0
+          ? allowedSlotsForWeekday(selectedWeekday)
+          : [];
 
     const MIN_PER_SHIFT = 2;
 
@@ -236,6 +253,7 @@ export default function WatchmanClient({
             <div className="section">
                 <div className="section-header">
                     <h2>{t.watchman.schedule}</h2>
+                    <WatchmanPdfButton year={year} month={month} shifts={shifts} />
                 </div>
 
                 <div className="cal-controls">
@@ -290,13 +308,16 @@ export default function WatchmanClient({
                                 const weekday = new Date(
                                     Date.UTC(year, month, day)
                                 ).getUTCDay();
-                                const slotsForDay = allowedSlotsForWeekday(weekday);
                                 const shiftsBySlot = new Map<ShiftSlot, Shift[]>();
                                 for (const s of dayShifts) {
                                     const list = shiftsBySlot.get(s.slot) ?? [];
                                     list.push(s);
                                     shiftsBySlot.set(s.slot, list);
                                 }
+                                const slotsForDay = displaySlotsForDay(
+                                    weekday,
+                                    shiftsBySlot.keys(),
+                                );
                                 return (
                                     <button
                                         key={day}
@@ -377,7 +398,7 @@ export default function WatchmanClient({
                                 {t.watchman.scheduled}
                             </div>
                             <ul className="wm-shift-list">
-                                {selectedAllowedSlots.map((slot) => {
+                                {selectedDisplaySlots.map((slot) => {
                                     const slotShifts = shiftsForSlot(slot);
                                     const count = slotShifts.length;
                                     const isUnderfilled = count < MIN_PER_SHIFT;
@@ -483,7 +504,7 @@ export default function WatchmanClient({
                                             id="wm-shift-slot"
                                             name="slot"
                                             required
-                                            defaultValue={selectedAllowedSlots[0]}
+                                            defaultValue={selectedAssignableSlots[0]}
                                             onChange={(e) => {
                                                 // Reset watchman selection when slot changes so the
                                                 // filtered options are correct.
@@ -508,7 +529,7 @@ export default function WatchmanClient({
                                                 );
                                             }}
                                         >
-                                            {selectedAllowedSlots.map((slot) => (
+                                            {selectedAssignableSlots.map((slot) => (
                                                 <option key={slot} value={slot}>
                                                     {slotLabel(slot)} ({SHIFT_SLOT_TIMES[slot]})
                                                 </option>
@@ -529,7 +550,7 @@ export default function WatchmanClient({
                                             </option>
                                             {watchmen.map((w) => {
                                                 const firstSlot =
-                                                    selectedAllowedSlots[0];
+                                                    selectedAssignableSlots[0];
                                                 const alreadyOnFirst = firstSlot
                                                     ? shiftsForSlot(firstSlot).some(
                                                           (s) => s.watchmanId === w.id

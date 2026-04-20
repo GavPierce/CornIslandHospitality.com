@@ -2,7 +2,6 @@
 
 import { requireAdmin } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { allowedSlotsForWeekday } from '@/lib/watchman';
 import { ShiftSlot } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 
@@ -83,18 +82,14 @@ export async function createWatchmanShift(formData: FormData) {
     const date = parseDateOnly(dateStr);
     if (!date) return { error: 'Invalid date.' };
 
-    // Validate slot value
+    // Validate slot value. Admins may assign any of the four shifts to any
+    // day of the week — the calendar's weekday defaults are only guidance for
+    // coverage warnings, not a hard server-side restriction.
     const validSlots: ShiftSlot[] = ['EVENING', 'OVERNIGHT', 'MORNING', 'AFTERNOON'] as ShiftSlot[];
     if (!validSlots.includes(slotStr as ShiftSlot)) {
         return { error: 'Invalid shift.' };
     }
     const slot = slotStr as ShiftSlot;
-
-    // Validate that this slot is allowed on this weekday
-    const weekday = date.getUTCDay();
-    if (!allowedSlotsForWeekday(weekday).includes(slot)) {
-        return { error: 'That shift is not available on this day.' };
-    }
 
     const watchman = await prisma.watchman.findUnique({ where: { id: watchmanId } });
     if (!watchman) return { error: 'Watchman not found.' };
