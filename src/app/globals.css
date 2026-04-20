@@ -1112,7 +1112,7 @@ h6 {
 
 .wm-weekday-row {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 6px;
   margin-bottom: 8px;
 }
@@ -1129,7 +1129,7 @@ h6 {
 
 .wm-day-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 6px;
 }
 
@@ -1138,6 +1138,7 @@ h6 {
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-start;
+  min-width: 0;
   min-height: 130px;
   padding: 6px 8px;
   background: var(--bg-secondary);
@@ -1211,6 +1212,10 @@ h6 {
   font-size: 0.6rem;
   color: var(--text-secondary);
   white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 1;
 }
 
 .wm-shift-pill .wm-pill-name {
