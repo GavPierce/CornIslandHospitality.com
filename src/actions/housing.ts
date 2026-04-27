@@ -125,6 +125,34 @@ export async function createVolunteer(formData: FormData) {
     return { success: true };
 }
 
+export async function updateVolunteer(formData: FormData) {
+    const authError = await requireAdmin();
+    if (authError) return { error: authError };
+
+    const id = (formData.get('id') as string)?.trim();
+    const name = (formData.get('name') as string)?.trim();
+    const email = ((formData.get('email') as string) || '').trim() || null;
+    const phone = ((formData.get('phone') as string) || '').trim() || null;
+    const type = (formData.get('type') as VolunteerType) || undefined;
+
+    if (!id) return { error: 'Volunteer id is required.' };
+    if (!name) return { error: 'Name is required.' };
+
+    await prisma.volunteer.update({
+        where: { id },
+        data: {
+            name,
+            email,
+            phone,
+            ...(type ? { type } : {}),
+        },
+    });
+
+    revalidatePath('/volunteers');
+    revalidatePath('/planning');
+    return { success: true };
+}
+
 export async function deleteVolunteer(id: string) {
     const authError = await requireAdmin();
     if (authError) return { error: authError };

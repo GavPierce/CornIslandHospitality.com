@@ -6,6 +6,7 @@ import {
     deleteWatchman,
     deleteWatchmanShift,
     getWatchmanShifts,
+    updateWatchman,
 } from '@/actions/watchman';
 import type { UserRole } from '@/lib/auth';
 import { useTranslation } from '@/i18n/LanguageContext';
@@ -78,6 +79,7 @@ export default function WatchmanClient({
     const [month, setMonth] = useState(initialMonth);
     const [shifts, setShifts] = useState<Shift[]>(initialShifts);
     const [showPersonForm, setShowPersonForm] = useState(false);
+    const [editingId, setEditingId] = useState<string | null>(null);
     const [selectedDay, setSelectedDay] = useState<number | null>(null);
     const [error, setError] = useState('');
     const [, startTransition] = useTransition();
@@ -190,6 +192,21 @@ export default function WatchmanClient({
             return;
         }
         setShifts((prev) => prev.filter((s) => s.id !== id));
+    }
+
+    async function handleUpdatePerson(formData: FormData) {
+        setError('');
+        const result = await updateWatchman(formData);
+        if (result?.error) {
+            setError(result.error);
+            return;
+        }
+        setEditingId(null);
+        // Refresh the page so the watchmen list reflects the new contact info.
+        startTransition(async () => {
+            const fresh = await getWatchmanShifts(year, month);
+            setShifts(fresh as Shift[]);
+        });
     }
 
     async function handleDeletePerson(id: string) {
@@ -694,35 +711,94 @@ export default function WatchmanClient({
                                 </tr>
                             </thead>
                             <tbody>
-                                {watchmen.map((w) => (
-                                    <tr key={w.id}>
-                                        <td
-                                            style={{
-                                                color: 'var(--text-primary)',
-                                                fontWeight: 500,
-                                            }}
-                                        >
-                                            {w.name}
-                                        </td>
-                                        <td>
-                                            {w.email && <div>{w.email}</div>}
-                                            {w.phone && <div>{w.phone}</div>}
-                                            {!w.email && !w.phone && '—'}
-                                        </td>
-                                        {isAdmin && (
-                                            <td>
-                                                <button
-                                                    className="btn btn-danger btn-sm"
-                                                    onClick={() =>
-                                                        handleDeletePerson(w.id)
-                                                    }
+                                {watchmen.map((w) =>
+                                    editingId === w.id ? (
+                                        <tr key={w.id}>
+                                            <td colSpan={isAdmin ? 3 : 2}>
+                                                <form
+                                                    action={handleUpdatePerson}
+                                                    style={{
+                                                        display: 'grid',
+                                                        gap: 8,
+                                                        gridTemplateColumns:
+                                                            '1fr 1fr 1fr auto auto',
+                                                        alignItems: 'center',
+                                                    }}
                                                 >
-                                                    {t.watchman.delete}
-                                                </button>
+                                                    <input type="hidden" name="id" value={w.id} />
+                                                    <input
+                                                        name="name"
+                                                        defaultValue={w.name}
+                                                        required
+                                                        placeholder="Name"
+                                                        className="form-input"
+                                                    />
+                                                    <input
+                                                        name="phone"
+                                                        defaultValue={w.phone ?? ''}
+                                                        placeholder="+50588881111"
+                                                        type="tel"
+                                                        className="form-input"
+                                                    />
+                                                    <input
+                                                        name="email"
+                                                        defaultValue={w.email ?? ''}
+                                                        placeholder="email@example.com"
+                                                        type="email"
+                                                        className="form-input"
+                                                    />
+                                                    <button
+                                                        type="submit"
+                                                        className="btn btn-primary btn-sm"
+                                                    >
+                                                        Save
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-sm"
+                                                        onClick={() => setEditingId(null)}
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </form>
                                             </td>
-                                        )}
-                                    </tr>
-                                ))}
+                                        </tr>
+                                    ) : (
+                                        <tr key={w.id}>
+                                            <td
+                                                style={{
+                                                    color: 'var(--text-primary)',
+                                                    fontWeight: 500,
+                                                }}
+                                            >
+                                                {w.name}
+                                            </td>
+                                            <td>
+                                                {w.email && <div>{w.email}</div>}
+                                                {w.phone && <div>{w.phone}</div>}
+                                                {!w.email && !w.phone && '—'}
+                                            </td>
+                                            {isAdmin && (
+                                                <td style={{ display: 'flex', gap: 8 }}>
+                                                    <button
+                                                        className="btn btn-sm"
+                                                        onClick={() => setEditingId(w.id)}
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                    <button
+                                                        className="btn btn-danger btn-sm"
+                                                        onClick={() =>
+                                                            handleDeletePerson(w.id)
+                                                        }
+                                                    >
+                                                        {t.watchman.delete}
+                                                    </button>
+                                                </td>
+                                            )}
+                                        </tr>
+                                    ),
+                                )}
                             </tbody>
                         </table>
                     </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { createVolunteer, deleteVolunteer } from '@/actions/housing';
+import { createVolunteer, deleteVolunteer, updateVolunteer } from '@/actions/housing';
 import type { UserRole } from '@/lib/auth';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { useState } from 'react';
@@ -41,6 +41,7 @@ export default function VolunteersClient({
     const isAdmin = role === 'admin';
     const { t } = useTranslation();
     const [showForm, setShowForm] = useState(false);
+    const [editingId, setEditingId] = useState<string | null>(null);
     const [error, setError] = useState('');
 
     function typeLabel(type: string) {
@@ -57,6 +58,13 @@ export default function VolunteersClient({
         const result = await createVolunteer(formData);
         if (result?.error) setError(result.error);
         else setShowForm(false);
+    }
+
+    async function handleUpdate(formData: FormData) {
+        setError('');
+        const result = await updateVolunteer(formData);
+        if (result?.error) setError(result.error);
+        else setEditingId(null);
     }
 
     return (
@@ -133,6 +141,66 @@ export default function VolunteersClient({
                             <tbody>
                                 {volunteers.map((v) => {
                                     const currentAssignment = v.assignments[0];
+                                    if (editingId === v.id) {
+                                        return (
+                                            <tr key={v.id}>
+                                                <td colSpan={isAdmin ? 5 : 4}>
+                                                    <form
+                                                        action={handleUpdate}
+                                                        style={{
+                                                            display: 'grid',
+                                                            gap: 8,
+                                                            gridTemplateColumns:
+                                                                '1fr 1fr 1fr 1fr auto auto',
+                                                            alignItems: 'center',
+                                                        }}
+                                                    >
+                                                        <input type="hidden" name="id" value={v.id} />
+                                                        <input
+                                                            name="name"
+                                                            defaultValue={v.name}
+                                                            required
+                                                            placeholder="Name"
+                                                            className="form-input"
+                                                        />
+                                                        <select
+                                                            name="type"
+                                                            defaultValue={v.type}
+                                                            className="form-input"
+                                                        >
+                                                            <option value="SINGLE_BROTHER">{t.types.singleBrother}</option>
+                                                            <option value="SINGLE_SISTER">{t.types.singleSister}</option>
+                                                            <option value="MARRIED_COUPLE">{t.types.marriedCouple}</option>
+                                                        </select>
+                                                        <input
+                                                            name="phone"
+                                                            defaultValue={v.phone ?? ''}
+                                                            placeholder="+50588881111"
+                                                            type="tel"
+                                                            className="form-input"
+                                                        />
+                                                        <input
+                                                            name="email"
+                                                            defaultValue={v.email ?? ''}
+                                                            placeholder="email@example.com"
+                                                            type="email"
+                                                            className="form-input"
+                                                        />
+                                                        <button type="submit" className="btn btn-primary btn-sm">
+                                                            Save
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-sm"
+                                                            onClick={() => setEditingId(null)}
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                        );
+                                    }
                                     return (
                                         <tr key={v.id}>
                                             <td style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{v.name}</td>
@@ -154,7 +222,13 @@ export default function VolunteersClient({
                                                 )}
                                             </td>
                                             {isAdmin && (
-                                                <td>
+                                                <td style={{ display: 'flex', gap: 8 }}>
+                                                    <button
+                                                        className="btn btn-sm"
+                                                        onClick={() => setEditingId(v.id)}
+                                                    >
+                                                        Edit
+                                                    </button>
                                                     <button
                                                         className="btn btn-danger btn-sm"
                                                         onClick={() => deleteVolunteer(v.id)}
