@@ -9,6 +9,7 @@ const es: Translations = {
     calendar: 'Calendario',
     watchman: 'Vigilante Nocturno',
     logout: 'Cerrar Sesión',
+    whatsappSetup: 'Configurar WhatsApp',
   },
 
   // Dashboard
@@ -110,13 +111,34 @@ const es: Translations = {
     roomCol: 'Habitación',
   },
 
+  // Mi panel (usuario individual)
+  myDashboard: {
+    welcomeLabel: 'Sesión iniciada como',
+    upcomingShifts: 'Mis próximos turnos',
+    noUpcomingShifts: 'No tienes turnos programados próximamente.',
+    myAssignments: 'Mis asignaciones de hospedaje',
+    noAssignments: 'No tienes asignaciones de hospedaje activas.',
+    viewFullSchedule: 'Ver horario completo',
+  },
+
   // Login
   login: {
     title: 'Corn Island',
     subtitle: 'Planificación de Hospitalidad',
-    passwordLabel: 'Contraseña de Administrador',
-    passwordPlaceholder: 'Ingrese la contraseña...',
-    signIn: 'Iniciar Sesión',
+    phoneLabel: 'Número de teléfono',
+    phonePlaceholder: '+505 8888 6666',
+    phoneHelp: 'Te enviaremos un código de 6 dígitos por WhatsApp.',
+    sendCode: 'Enviar código',
+    codeLabel: 'Código de verificación',
+    codePlaceholder: '123456',
+    codeHelp: 'Ingresa el código de 6 dígitos que enviamos a tu WhatsApp.',
+    verify: 'Verificar e iniciar sesión',
+    changePhone: 'Usar otro número',
+    resend: 'Reenviar código',
+    sending: 'Enviando\u2026',
+    verifying: 'Verificando\u2026',
+    signedInAs: 'Sesión iniciada como',
+    signOut: 'Cerrar sesión',
   },
 
   // Night Watchman

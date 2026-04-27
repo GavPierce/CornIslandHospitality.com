@@ -14,6 +14,11 @@ enum VolunteerType {
   MARRIED_COUPLE
 }
 
+enum Language {
+  EN
+  ES
+}
+
 enum ShiftSlot {
   EVENING    // 5:00 pm – 12:30 am
   OVERNIGHT  // 12:30 am – 8:00 am
@@ -48,6 +53,7 @@ model Volunteer {
   email         String?
   phone         String?
   type          VolunteerType
+  language      Language?     // preferred language for WhatsApp reminders
   assignments   Assignment[]
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
@@ -73,6 +79,7 @@ model Watchman {
   name        String
   email       String?
   phone       String?
+  language    Language?       // preferred language for WhatsApp reminders
   shifts      WatchmanShift[]
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
@@ -91,4 +98,79 @@ model WatchmanShift {
   @@unique([watchmanId, date, slot])
   @@index([date])
   @@index([watchmanId])
+}
+
+// ─── Passwordless auth (phone + WhatsApp OTP) ─────────────
+
+enum IdentityType {
+  WATCHMAN
+  VOLUNTEER
+}
+
+model AuthOtp {
+  id         String    @id @default(cuid())
+  phone      String    // normalized E.164 (e.g. +50588886666)
+  codeHash   String    // sha256 hex of the 6-digit code
+  expiresAt  DateTime
+  consumedAt DateTime?
+  attempts   Int       @default(0)
+  createdAt  DateTime  @default(now())
+
+  @@index([phone])
+  @@index([expiresAt])
+}
+
+model AuthSession {
+  id           String       @id @default(cuid())
+  token        String       @unique  // opaque random token stored in the cookie
+  phone        String       // normalized E.164
+  name         String       // display name captured at login
+  identityType IdentityType
+  identityId   String       // id of the linked Watchman or Volunteer row
+  isAdmin      Boolean      @default(false)
+  expiresAt    DateTime
+  lastSeenAt   DateTime     @default(now())
+  createdAt    DateTime     @default(now())
+
+  @@index([phone])
+  @@index([expiresAt])
+}
+
+// ─── WhatsApp reminders ──────────────────────────────────
+
+enum ReminderKind {
+  WATCHMAN_SHIFT        // day-of reminder to the watchman
+  VOLUNTEER_ARRIVAL     // day-of welcome to the volunteer
+  VOLUNTEER_DEPARTURE   // day-of checkout reminder to the volunteer
+  ADMIN_DAILY_DIGEST    // daily summary to each admin phone
+}
+
+/**
+ * One row per (kind, recipient, reference) tuple that has been reminded.
+ * The unique index is what prevents the scheduler from double-sending
+ * if it runs more than once per day (e.g. after a redeploy). `referenceId`
+ * is a shift id, an assignment id, or a date key (`YYYY-MM-DD`) for the
+ * admin digest.
+ */
+model ReminderLog {
+  id             String       @id @default(cuid())
+  kind           ReminderKind
+  recipientPhone String       // normalized E.164
+  referenceId    String
+  sentAt         DateTime     @default(now())
+
+  @@unique([kind, recipientPhone, referenceId])
+  @@index([sentAt])
+}
+
+// ─── App-wide settings ───────────────────────────────────
+//
+// Single-row-per-key key/value store for runtime feature flags that an
+// admin can toggle without redeploying. Currently used for the
+// reminders kill switch (`reminders.enabled`).
+
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
 }

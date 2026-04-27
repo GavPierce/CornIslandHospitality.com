@@ -4,16 +4,40 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useTranslation } from '@/i18n/LanguageContext';
+import { logout } from '@/actions/auth';
+
+type MeUser = {
+    name: string;
+    phone: string;
+    isAdmin: boolean;
+    identityType: 'WATCHMAN' | 'VOLUNTEER';
+};
 
 export default function SidebarClient() {
     const { locale, setLocale, t } = useTranslation();
     const pathname = usePathname();
     const [open, setOpen] = useState(false);
+    const [me, setMe] = useState<MeUser | null>(null);
+
+    // Fetch current user once on mount so we can show who is signed in.
+    useEffect(() => {
+        let cancelled = false;
+        fetch('/api/me')
+            .then((r) => r.ok ? r.json() : { user: null })
+            .then((data) => { if (!cancelled) setMe(data.user); })
+            .catch(() => { /* ignored */ });
+        return () => { cancelled = true; };
+    }, []);
 
     // Close drawer on route change
     useEffect(() => {
         setOpen(false);
     }, [pathname]);
+
+    async function handleLogout() {
+        await logout();
+        window.location.href = '/login';
+    }
 
     // Prevent body scroll when drawer open on mobile
     useEffect(() => {
@@ -80,7 +104,37 @@ export default function SidebarClient() {
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
                     {t.nav.watchman}
                 </Link>
+                {me?.isAdmin && (
+                    <Link href="/admin/whatsapp-setup" className="nav-link" id="nav-whatsapp-setup">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>
+                        {t.nav.whatsappSetup}
+                    </Link>
+                )}
             </nav>
+
+            {/* Signed-in user + logout */}
+            {me && (
+                <div className="sidebar-user">
+                    <div className="sidebar-user-info">
+                        <div className="sidebar-user-label">{t.login.signedInAs}</div>
+                        <div className="sidebar-user-name">{me.name}</div>
+                        <div className="sidebar-user-phone">{me.phone}</div>
+                    </div>
+                    <button
+                        type="button"
+                        className="sidebar-logout-btn"
+                        onClick={handleLogout}
+                        aria-label={t.login.signOut}
+                    >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                            <polyline points="16 17 21 12 16 7" />
+                            <line x1="21" y1="12" x2="9" y2="12" />
+                        </svg>
+                        <span>{t.login.signOut}</span>
+                    </button>
+                </div>
+            )}
 
             {/* Language Toggle */}
             <div className="lang-toggle">

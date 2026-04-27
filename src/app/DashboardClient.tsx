@@ -5,6 +5,7 @@ import type { UserRole } from '@/lib/auth';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { useState } from 'react';
 import HousesPdfButton from './HousesPdfButton';
+import MyScheduleCard, { type MyAssignment, type MyShift } from './MyScheduleCard';
 
 type HouseWithRooms = {
     id: string;
@@ -38,6 +39,10 @@ export default function DashboardClient({
     totalBeds,
     maxCapacity,
     role,
+    userName,
+    identityType,
+    myShifts,
+    myAssignments,
 }: {
     houses: HouseWithRooms[];
     volunteerCount: number;
@@ -45,6 +50,10 @@ export default function DashboardClient({
     totalBeds: number;
     maxCapacity: number;
     role: UserRole;
+    userName: string | null;
+    identityType: 'WATCHMAN' | 'VOLUNTEER' | null;
+    myShifts: MyShift[];
+    myAssignments: MyAssignment[];
 }) {
     const isAdmin = role === 'admin';
     const { t } = useTranslation();
@@ -80,6 +89,17 @@ export default function DashboardClient({
                 <h1>{t.dashboard.title}</h1>
                 <p>{t.dashboard.subtitle}</p>
             </div>
+
+            {/* Personalized schedule (shown for everyone, so admins see their own
+                shifts at a glance too). Skipped if no identity is attached. */}
+            {userName && identityType && (
+                <MyScheduleCard
+                    userName={userName}
+                    identityType={identityType}
+                    shifts={myShifts}
+                    assignments={myAssignments}
+                />
+            )}
 
             {/* Stats */}
             <div className="stats-grid">

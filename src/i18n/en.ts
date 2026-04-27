@@ -6,6 +6,7 @@ export type Translations = {
     calendar: string;
     watchman: string;
     logout: string;
+    whatsappSetup: string;
   };
   dashboard: {
     title: string;
@@ -98,12 +99,31 @@ export type Translations = {
     noRoomsDesc: string;
     roomCol: string;
   };
+  myDashboard: {
+    welcomeLabel: string;
+    upcomingShifts: string;
+    noUpcomingShifts: string;
+    myAssignments: string;
+    noAssignments: string;
+    viewFullSchedule: string;
+  };
   login: {
     title: string;
     subtitle: string;
-    passwordLabel: string;
-    passwordPlaceholder: string;
-    signIn: string;
+    phoneLabel: string;
+    phonePlaceholder: string;
+    phoneHelp: string;
+    sendCode: string;
+    codeLabel: string;
+    codePlaceholder: string;
+    codeHelp: string;
+    verify: string;
+    changePhone: string;
+    resend: string;
+    sending: string;
+    verifying: string;
+    signedInAs: string;
+    signOut: string;
   };
   watchman: {
     title: string;
@@ -161,6 +181,7 @@ const en: Translations = {
     calendar: 'Calendar',
     watchman: 'Night Watchman',
     logout: 'Logout',
+    whatsappSetup: 'WhatsApp Setup',
   },
   dashboard: {
     title: 'Dashboard',
@@ -253,12 +274,31 @@ const en: Translations = {
     noRoomsDesc: 'Add houses and rooms on the Dashboard first.',
     roomCol: 'Room',
   },
+  myDashboard: {
+    welcomeLabel: 'Signed in as',
+    upcomingShifts: 'My upcoming shifts',
+    noUpcomingShifts: 'You have no upcoming shifts scheduled.',
+    myAssignments: 'My housing assignments',
+    noAssignments: 'You have no active housing assignments.',
+    viewFullSchedule: 'View full schedule',
+  },
   login: {
     title: 'Corn Island',
     subtitle: 'Hospitality Planning',
-    passwordLabel: 'Administrator Password',
-    passwordPlaceholder: 'Enter password...',
-    signIn: 'Sign In',
+    phoneLabel: 'Phone number',
+    phonePlaceholder: '+505 8888 6666',
+    phoneHelp: 'We\u2019ll send a 6-digit code to your WhatsApp.',
+    sendCode: 'Send code',
+    codeLabel: 'Verification code',
+    codePlaceholder: '123456',
+    codeHelp: 'Enter the 6-digit code we sent to your WhatsApp.',
+    verify: 'Verify and sign in',
+    changePhone: 'Use a different number',
+    resend: 'Resend code',
+    sending: 'Sending\u2026',
+    verifying: 'Verifying\u2026',
+    signedInAs: 'Signed in as',
+    signOut: 'Sign out',
   },
   watchman: {
     title: 'Night Watchman',

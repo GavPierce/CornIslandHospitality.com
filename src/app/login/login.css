@@ -337,6 +337,46 @@
     color: var(--accent-secondary);
 }
 
+/* ─── Hint text & secondary actions (phone/OTP flow) ─── */
+.login-hint {
+    margin-top: 8px;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.55);
+    line-height: 1.4;
+}
+
+.login-hint strong {
+    color: rgba(255, 255, 255, 0.85);
+    font-weight: 600;
+}
+
+.login-secondary-actions {
+    margin-top: 14px;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.login-link {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.85rem;
+    cursor: pointer;
+    padding: 4px 2px;
+    transition: color 0.15s ease;
+}
+
+.login-link:hover:not(:disabled) {
+    color: #fff;
+    text-decoration: underline;
+}
+
+.login-link:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
 /* ─── Responsive ─────────────────────────────── */
 @media (max-width: 480px) {
     .login-card {

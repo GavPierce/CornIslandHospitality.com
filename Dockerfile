@@ -38,6 +38,13 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 
+# WhatsApp (Baileys) pairing credentials live here. Mount a persistent
+# volume at this path in production (Coolify → Storage → add volume
+# `/app/wa-auth`) so the session survives redeploys.
+RUN mkdir -p /app/wa-auth && chown -R nextjs:nodejs /app/wa-auth
+VOLUME ["/app/wa-auth"]
+ENV WA_AUTH_DIR=/app/wa-auth
+
 USER nextjs
 EXPOSE 3000
 
