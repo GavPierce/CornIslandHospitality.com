@@ -116,6 +116,7 @@ export default function WatchmanClient({
         const labels = t.watchman.slots;
         switch (slot) {
             case 'MORNING': return labels.morning;
+            case 'LUNCH': return labels.lunch;
             case 'AFTERNOON': return labels.afternoon;
             case 'EVENING': return labels.evening;
             case 'OVERNIGHT': return labels.overnight;
@@ -126,6 +127,7 @@ export default function WatchmanClient({
     function slotClass(slot: ShiftSlot): string {
         switch (slot) {
             case 'MORNING': return 'wm-shift-pill slot-morning';
+            case 'LUNCH': return 'wm-shift-pill slot-lunch';
             case 'AFTERNOON': return 'wm-shift-pill slot-afternoon';
             case 'EVENING': return 'wm-shift-pill slot-evening';
             case 'OVERNIGHT': return 'wm-shift-pill slot-overnight';

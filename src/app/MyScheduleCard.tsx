@@ -40,6 +40,7 @@ export default function MyScheduleCard({
         const labels = t.watchman.slots;
         switch (slot) {
             case 'MORNING': return labels.morning;
+            case 'LUNCH': return labels.lunch;
             case 'AFTERNOON': return labels.afternoon;
             case 'EVENING': return labels.evening;
             case 'OVERNIGHT': return labels.overnight;

@@ -161,6 +161,7 @@ export type Translations = {
     staffed: string;
     slots: {
       morning: string;
+      lunch: string;
       afternoon: string;
       evening: string;
       overnight: string;
@@ -336,6 +337,7 @@ const en: Translations = {
     staffed: 'staffed',
     slots: {
       morning: 'Morning',
+      lunch: 'Lunch',
       afternoon: 'Afternoon',
       evening: 'Evening',
       overnight: 'Overnight',

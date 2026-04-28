@@ -24,6 +24,7 @@ enum ShiftSlot {
   OVERNIGHT  // 12:30 am – 8:00 am
   MORNING    // 8:00 am – 12:30 pm (Sun & Mon only)
   AFTERNOON  // 12:30 pm – 5:00 pm (Sun & Mon only)
+  LUNCH      // 12:00 pm – 1:00 pm (Tue–Sat only)
 }
 
 model House {

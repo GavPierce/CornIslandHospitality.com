@@ -22,7 +22,7 @@ import { getRemindersEnabled } from './settings';
 // ── Types (minimal, local — avoids leaking Prisma's regenerated enum shape)
 
 type Language = 'EN' | 'ES';
-type ShiftSlot = 'EVENING' | 'OVERNIGHT' | 'MORNING' | 'AFTERNOON';
+type ShiftSlot = 'EVENING' | 'OVERNIGHT' | 'MORNING' | 'AFTERNOON' | 'LUNCH';
 type ReminderKind =
     | 'WATCHMAN_SHIFT'
     | 'VOLUNTEER_ARRIVAL'
@@ -76,6 +76,7 @@ function slotLabel(slot: ShiftSlot, lang: Language): string {
         OVERNIGHT: { en: 'Overnight (12:30 am – 8:00 am)', es: 'Madrugada (12:30 am – 8:00 am)' },
         MORNING: { en: 'Morning (8:00 am – 12:30 pm)', es: 'Mañana (8:00 am – 12:30 pm)' },
         AFTERNOON: { en: 'Afternoon (12:30 pm – 5:00 pm)', es: 'Tarde (12:30 pm – 5:00 pm)' },
+        LUNCH: { en: 'Lunch (12:00 pm – 1:00 pm)', es: 'Almuerzo (12:00 pm – 1:00 pm)' },
     };
     return lang === 'ES' ? map[slot].es : map[slot].en;
 }

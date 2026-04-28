@@ -1305,6 +1305,11 @@ h6 {
   border-left-color: #f59e0b;
 }
 
+.wm-shift-pill.slot-lunch {
+  background: rgba(234, 179, 8, 0.18);
+  border-left-color: #eab308;
+}
+
 .wm-shift-pill.slot-afternoon {
   background: rgba(16, 185, 129, 0.18);
   border-left-color: #10b981;

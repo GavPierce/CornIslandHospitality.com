@@ -106,7 +106,7 @@ export async function createWatchmanShift(formData: FormData) {
     // Validate slot value. Admins may assign any of the four shifts to any
     // day of the week — the calendar's weekday defaults are only guidance for
     // coverage warnings, not a hard server-side restriction.
-    const validSlots: ShiftSlot[] = ['EVENING', 'OVERNIGHT', 'MORNING', 'AFTERNOON'] as ShiftSlot[];
+    const validSlots: ShiftSlot[] = ['EVENING', 'OVERNIGHT', 'MORNING', 'AFTERNOON', 'LUNCH'] as ShiftSlot[];
     if (!validSlots.includes(slotStr as ShiftSlot)) {
         return { error: 'Invalid shift.' };
     }

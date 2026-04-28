@@ -178,6 +178,7 @@ const es: Translations = {
     staffed: 'cubierto',
     slots: {
       morning: 'Mañana',
+      lunch: 'Almuerzo',
       afternoon: 'Tarde',
       evening: 'Noche',
       overnight: 'Madrugada',
