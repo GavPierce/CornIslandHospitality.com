@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { getAllTemplates, saveTemplate } from '@/actions/templates';
 
 type Status = {
     state: 'disconnected' | 'connecting' | 'qr' | 'connected';
@@ -15,6 +16,14 @@ type RunSummary = {
     errors: number;
     disabled?: boolean;
 };
+
+const TEMPLATE_CONFIGS = [
+    { id: 'WATCHMAN_SHIFT', label: 'Watchman Shift', vars: '{name}, {date}, {slot}' },
+    { id: 'VOLUNTEER_ARRIVAL', label: 'Volunteer Arrival', vars: '{name}, {houseName}, {houseAddress}, {roomName}, {endDate}' },
+    { id: 'VOLUNTEER_DEPARTURE', label: 'Volunteer Departure', vars: '{name}, {houseName}, {roomName}' },
+    { id: 'ASSIGNMENT_CONFIRMATION', label: 'Assignment Confirmation (Volunteer)', vars: '{volunteerName}, {houseName}, {houseAddress}, {roomName}, {startDate}, {endDate}' },
+    { id: 'OWNER_NOTIFICATION', label: 'Owner Notification', vars: '{ownerName}, {volunteerName}, {houseName}, {roomName}, {startDate}, {endDate}' },
+];
 
 export default function WhatsAppSetupClient({
     apiToken,
@@ -46,6 +55,11 @@ export default function WhatsAppSetupClient({
         | { ok: false; error: string }
         | null
     >(null);
+
+    // ─── Templates ──────────────────────────────────────
+    const [templates, setTemplates] = useState<Record<string, string>>({});
+    const [savingTemplate, setSavingTemplate] = useState<string | null>(null);
+    const [saveTemplateSuccess, setSaveTemplateSuccess] = useState<string | null>(null);
 
     const tokenQs = apiToken ? `?token=${encodeURIComponent(apiToken)}` : '';
 
@@ -92,6 +106,16 @@ export default function WhatsAppSetupClient({
         return () => {
             cancelled = true;
         };
+    }, [canRunReminders]);
+
+    // Load templates
+    useEffect(() => {
+        if (!canRunReminders) return;
+        let cancelled = false;
+        getAllTemplates().then((data) => {
+            if (!cancelled) setTemplates(data);
+        }).catch(console.error);
+        return () => { cancelled = true; };
     }, [canRunReminders]);
 
     async function handleToggleReminders() {
@@ -169,6 +193,23 @@ export default function WhatsAppSetupClient({
             await fetchStatus();
         } finally {
             setResetting(false);
+        }
+    }
+
+    async function handleSaveTemplate(key: string, value: string) {
+        setSavingTemplate(key);
+        try {
+            const res = await saveTemplate(key, value);
+            if (res.success) {
+                setSaveTemplateSuccess(key);
+                setTimeout(() => setSaveTemplateSuccess(null), 2000);
+            } else {
+                alert(`Failed to save: ${res.error}`);
+            }
+        } catch (err) {
+            alert(`Failed to save: ${(err as Error).message}`);
+        } finally {
+            setSavingTemplate(null);
         }
     }
 
@@ -413,6 +454,59 @@ export default function WhatsAppSetupClient({
                             </p>
                         )}
                     </form>
+                </div>
+            )}
+
+            {canRunReminders && state === 'connected' && (
+                <div className="glass-panel" style={{ padding: 24, display: 'grid', gap: 24, marginTop: 18 }}>
+                    <div>
+                        <h2 style={{ margin: 0, fontSize: '1.05rem' }}>Message Templates</h2>
+                        <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>
+                            Customize the automated WhatsApp messages. Leave a box empty to use the default text.
+                        </p>
+                    </div>
+                    
+                    {TEMPLATE_CONFIGS.map((cfg) => (
+                        <div key={cfg.id} style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: 20 }}>
+                            <h3 style={{ margin: '0 0 4px 0', fontSize: '1rem', fontWeight: 600 }}>{cfg.label}</h3>
+                            <p style={{ margin: '0 0 12px 0', fontSize: '0.78rem', color: 'var(--text-tertiary)' }}>
+                                Available variables: <code style={{ color: 'var(--accent-secondary)' }}>{cfg.vars}</code>
+                            </p>
+                            <div style={{ display: 'grid', gap: 16 }}>
+                                {['EN', 'ES'].map((lang) => {
+                                    const key = `template.${cfg.id}.${lang}`;
+                                    const val = templates[key] ?? '';
+                                    const isSaving = savingTemplate === key;
+                                    const isSuccess = saveTemplateSuccess === key;
+                                    return (
+                                        <div key={key}>
+                                            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: 4 }}>
+                                                {lang === 'EN' ? 'English' : 'Spanish'}
+                                            </label>
+                                            <textarea
+                                                value={val}
+                                                onChange={(e) => setTemplates({ ...templates, [key]: e.target.value })}
+                                                placeholder={`Default ${lang} text will be used`}
+                                                rows={4}
+                                                style={{ ...inputStyle, fontFamily: 'inherit', resize: 'vertical', marginBottom: 8 }}
+                                            />
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                                <button
+                                                    onClick={() => handleSaveTemplate(key, val)}
+                                                    disabled={isSaving}
+                                                    className="btn btn-sm"
+                                                    style={{ border: '1px solid var(--border-color)', fontSize: '0.8rem' }}
+                                                >
+                                                    {isSaving ? 'Saving...' : 'Save'}
+                                                </button>
+                                                {isSuccess && <span style={{ color: '#34d399', fontSize: '0.8rem' }}>✓ Saved</span>}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    ))}
                 </div>
             )}
         </div>

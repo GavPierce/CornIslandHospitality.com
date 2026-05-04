@@ -38,6 +38,16 @@ export type Translations = {
     beds: string;
     add: string;
     addRoom: string;
+    // watchman schedule at-a-glance
+    watchScheduleTitle: string;
+    watchScheduleSubtitle: string;
+    noShiftsTonight: string;
+    noShiftsTonightDesc: string;
+    tonightsWatch: string;
+    partner: string;
+    noPartner: string;
+    viewFullSchedule: string;
+    upcomingShifts: string;
   };
   volunteers: {
     title: string;
@@ -186,7 +196,7 @@ const en: Translations = {
   },
   dashboard: {
     title: 'Dashboard',
-    subtitle: 'Overview of all houses, rooms, and current occupancy',
+    subtitle: 'Volunteer schedule and ministry overview',
     totalHouses: 'Total Houses',
     totalBeds: 'Total Beds',
     maxCapacity: 'Max Capacity',
@@ -214,6 +224,15 @@ const en: Translations = {
     beds: 'Beds',
     add: 'Add',
     addRoom: '+ Add Room',
+    watchScheduleTitle: 'Night Watchman Schedule',
+    watchScheduleSubtitle: 'Who is on duty tonight and coming up',
+    noShiftsTonight: 'No shifts scheduled tonight',
+    noShiftsTonightDesc: 'Add shifts on the Night Watchman page.',
+    tonightsWatch: "Tonight's Watch",
+    partner: 'Partner',
+    noPartner: 'Alone',
+    viewFullSchedule: 'Full Schedule →',
+    upcomingShifts: 'Upcoming shifts (next 7 days)',
   },
   volunteers: {
     title: 'Volunteers',
@@ -255,7 +274,7 @@ const en: Translations = {
     assignVolunteer: 'Assign Volunteer',
     currentAssignments: 'Current Assignments',
     noHouses: 'No houses available',
-    noHousesDesc: 'Create houses and rooms on the Dashboard first.',
+    noHousesDesc: 'Add a house above to start managing accommodations.',
     noRoomsYet: 'No rooms added yet.',
     beds: 'beds',
     unassignedVolunteers: 'Unassigned Volunteers',
@@ -272,7 +291,7 @@ const en: Translations = {
     house: 'House',
     allHouses: 'All Houses',
     noRooms: 'No rooms to display',
-    noRoomsDesc: 'Add houses and rooms on the Dashboard first.',
+    noRoomsDesc: 'Add houses and rooms on the Planning page first.',
     roomCol: 'Room',
   },
   myDashboard: {

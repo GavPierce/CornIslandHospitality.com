@@ -27,7 +27,8 @@ type ReminderKind =
     | 'WATCHMAN_SHIFT'
     | 'VOLUNTEER_ARRIVAL'
     | 'VOLUNTEER_DEPARTURE'
-    | 'ADMIN_DAILY_DIGEST';
+    | 'ADMIN_DAILY_DIGEST'
+    | 'ASSIGNMENT_CONFIRMATION';
 
 const DEFAULT_TZ = process.env.REMINDER_TZ || 'America/Managua';
 const DEFAULT_LANG: Language = 'ES';
@@ -70,6 +71,8 @@ function formatLongDate(d: Date, lang: Language): string {
 
 // ── Message templates ─────────────────────────────────────────
 
+import { getTemplate } from '@/actions/templates';
+
 function slotLabel(slot: ShiftSlot, lang: Language): string {
     const map: Record<ShiftSlot, { en: string; es: string }> = {
         EVENING: { en: 'Evening (5:00 pm – 12:30 am)', es: 'Tarde-Noche (5:00 pm – 12:30 am)' },
@@ -81,79 +84,132 @@ function slotLabel(slot: ShiftSlot, lang: Language): string {
     return lang === 'ES' ? map[slot].es : map[slot].en;
 }
 
-function msgWatchmanShift(params: {
+async function msgWatchmanShift(params: {
     name: string;
     date: Date;
     slot: ShiftSlot;
     lang: Language;
-}): string {
+}): Promise<string> {
     const { name, date, slot, lang } = params;
     const when = formatLongDate(date, lang);
-    if (lang === 'ES') {
-        return (
-            `👷 *Recordatorio de turno* — Hola ${name}!\n\n` +
-            `Tienes tu turno de vigilancia *hoy (${when})*.\n` +
-            `Horario: ${slotLabel(slot, lang)}.\n\n` +
-            `Gracias por tu servicio. — Corn Island Hospitality`
-        );
+    const slotText = slotLabel(slot, lang);
+    
+    let template = await getTemplate(`template.WATCHMAN_SHIFT.${lang}`);
+    if (!template) {
+        template = lang === 'ES'
+            ? `👷 *Recordatorio de turno* — Hola {name}!\n\nTienes tu turno de vigilancia *hoy ({date})*.\nHorario: {slot}.\n\nGracias por tu servicio. — Corn Island Hospitality`
+            : `👷 *Shift reminder* — Hi {name}!\n\nYou have a shift *today ({date})*.\nSlot: {slot}.\n\nThanks for serving. — Corn Island Hospitality`;
     }
-    return (
-        `👷 *Shift reminder* — Hi ${name}!\n\n` +
-        `You have a night-watch shift *today (${when})*.\n` +
-        `Slot: ${slotLabel(slot, lang)}.\n\n` +
-        `Thanks for serving. — Corn Island Hospitality`
-    );
+    
+    return template
+        .replace(/{name}/g, name)
+        .replace(/{date}/g, when)
+        .replace(/{slot}/g, slotText);
 }
 
-function msgVolunteerArrival(params: {
+async function msgVolunteerArrival(params: {
     name: string;
     houseName: string;
     houseAddress: string;
     roomName: string;
     endDate: Date;
     lang: Language;
-}): string {
+}): Promise<string> {
     const { name, houseName, houseAddress, roomName, endDate, lang } = params;
     const until = formatLongDate(endDate, lang);
-    if (lang === 'ES') {
-        return (
-            `🏠 *¡Bienvenido/a, ${name}!*\n\n` +
-            `Hoy comienza tu estadía en *${houseName}* (${houseAddress}).\n` +
-            `Habitación: *${roomName}*.\n` +
-            `Fecha de salida prevista: *${until}*.\n\n` +
-            `Si necesitas ayuda, contacta a tu coordinador. — Corn Island Hospitality`
-        );
+    
+    let template = await getTemplate(`template.VOLUNTEER_ARRIVAL.${lang}`);
+    if (!template) {
+        template = lang === 'ES'
+            ? `🏠 *¡Bienvenido/a, {name}!*\n\nHoy comienza tu estadía en *{houseName}* ({houseAddress}).\nHabitación: *{roomName}*.\nFecha de salida prevista: *{endDate}*.\n\nSi necesitas ayuda, contacta a tu coordinador. — Corn Island Hospitality`
+            : `🏠 *Welcome, {name}!*\n\nYour stay at *{houseName}* ({houseAddress}) starts today.\nRoom: *{roomName}*.\nScheduled checkout: *{endDate}*.\n\nIf you need anything, reach out to your coordinator. — Corn Island Hospitality`;
     }
-    return (
-        `🏠 *Welcome, ${name}!*\n\n` +
-        `Your stay at *${houseName}* (${houseAddress}) starts today.\n` +
-        `Room: *${roomName}*.\n` +
-        `Scheduled checkout: *${until}*.\n\n` +
-        `If you need anything, reach out to your coordinator. — Corn Island Hospitality`
-    );
+
+    return template
+        .replace(/{name}/g, name)
+        .replace(/{houseName}/g, houseName)
+        .replace(/{houseAddress}/g, houseAddress)
+        .replace(/{roomName}/g, roomName)
+        .replace(/{endDate}/g, until);
 }
 
-function msgVolunteerDeparture(params: {
+async function msgVolunteerDeparture(params: {
     name: string;
     houseName: string;
     roomName: string;
     lang: Language;
-}): string {
+}): Promise<string> {
     const { name, houseName, roomName, lang } = params;
-    if (lang === 'ES') {
-        return (
-            `👋 *Último día* — Hola ${name}!\n\n` +
-            `Hoy es tu último día en *${houseName}* (habitación ${roomName}).\n` +
-            `Por favor, deja la habitación limpia antes de salir. ¡Gracias por tu visita!\n\n` +
-            `— Corn Island Hospitality`
-        );
+    
+    let template = await getTemplate(`template.VOLUNTEER_DEPARTURE.${lang}`);
+    if (!template) {
+        template = lang === 'ES'
+            ? `👋 *Último día* — Hola {name}!\n\nHoy es tu último día en *{houseName}* (habitación {roomName}).\nPor favor, deja la habitación limpia antes de salir. ¡Gracias por tu visita!\n\n— Corn Island Hospitality`
+            : `👋 *Checkout day* — Hi {name}!\n\nToday is your last day at *{houseName}* (room {roomName}).\nPlease leave the room tidy before you go. Thanks for staying with us!\n\n— Corn Island Hospitality`;
     }
-    return (
-        `👋 *Checkout day* — Hi ${name}!\n\n` +
-        `Today is your last day at *${houseName}* (room ${roomName}).\n` +
-        `Please leave the room tidy before you go. Thanks for staying with us!\n\n` +
-        `— Corn Island Hospitality`
-    );
+
+    return template
+        .replace(/{name}/g, name)
+        .replace(/{houseName}/g, houseName)
+        .replace(/{roomName}/g, roomName);
+}
+
+async function msgAssignmentConfirmation(params: {
+    volunteerName: string;
+    houseName: string;
+    houseAddress: string;
+    roomName: string;
+    startDate: Date;
+    endDate: Date;
+    lang: Language;
+}): Promise<string> {
+    const { volunteerName, houseName, houseAddress, roomName, startDate, endDate, lang } = params;
+    const from = formatLongDate(startDate, lang);
+    const to = formatLongDate(endDate, lang);
+    
+    let template = await getTemplate(`template.ASSIGNMENT_CONFIRMATION.${lang}`);
+    if (!template) {
+        template = lang === 'ES'
+            ? `🏠 *Alojamiento confirmado — ¡Hola {volunteerName}!*\n\nSe te ha asignado una habitación en *{houseName}* ({houseAddress}).\nHabitación: *{roomName}*.\nFechas: {startDate} → {endDate}.\n\nSi tienes alguna pregunta, comunícate con tu coordinador.\n— Corn Island Hospitality`
+            : `🏠 *Housing confirmed — Hi {volunteerName}!*\n\nYou've been assigned a room at *{houseName}* ({houseAddress}).\nRoom: *{roomName}*.\nDates: {startDate} → {endDate}.\n\nIf you have any questions, reach out to your coordinator.\n— Corn Island Hospitality`;
+    }
+
+    return template
+        .replace(/{volunteerName}/g, volunteerName)
+        .replace(/{houseName}/g, houseName)
+        .replace(/{houseAddress}/g, houseAddress)
+        .replace(/{roomName}/g, roomName)
+        .replace(/{startDate}/g, from)
+        .replace(/{endDate}/g, to);
+}
+
+async function msgOwnerNotification(params: {
+    ownerName: string;
+    volunteerName: string;
+    houseName: string;
+    roomName: string;
+    startDate: Date;
+    endDate: Date;
+    lang: Language;
+}): Promise<string> {
+    const { ownerName, volunteerName, houseName, roomName, startDate, endDate, lang } = params;
+    const from = formatLongDate(startDate, lang);
+    const to = formatLongDate(endDate, lang);
+    
+    let template = await getTemplate(`template.OWNER_NOTIFICATION.${lang}`);
+    if (!template) {
+        template = lang === 'ES'
+            ? `🏡 *Nuevo huésped — Hola {ownerName}!*\n\n*{volunteerName}* ha sido asignado/a a una habitación en tu casa (*{houseName}*).\nHabitación: *{roomName}*.\nFechas: {startDate} → {endDate}.\n\n— Corn Island Hospitality`
+            : `🏡 *New guest arriving — Hi {ownerName}!*\n\n*{volunteerName}* has been assigned a room in your home (*{houseName}*).\nRoom: *{roomName}*.\nDates: {startDate} → {endDate}.\n\n— Corn Island Hospitality`;
+    }
+
+    return template
+        .replace(/{ownerName}/g, ownerName)
+        .replace(/{volunteerName}/g, volunteerName)
+        .replace(/{houseName}/g, houseName)
+        .replace(/{roomName}/g, roomName)
+        .replace(/{startDate}/g, from)
+        .replace(/{endDate}/g, to);
 }
 
 type DigestEntry = {
@@ -170,6 +226,27 @@ function msgAdminDigest(params: {
     const { date, data, lang } = params;
     const when = formatLongDate(date, lang);
     const none = lang === 'ES' ? '—' : '—';
+    
+    // Group shifts by slot
+    const slotOrder: ShiftSlot[] = ['MORNING', 'LUNCH', 'AFTERNOON', 'EVENING', 'OVERNIGHT'];
+    const groupedShifts = new Map<ShiftSlot, string[]>();
+    for (const s of data.shifts) {
+        if (!groupedShifts.has(s.slot)) groupedShifts.set(s.slot, []);
+        groupedShifts.get(s.slot)!.push(s.name);
+    }
+    
+    let shiftsText = '';
+    if (data.shifts.length === 0) {
+        shiftsText = `  ${none}`;
+    } else {
+        const sortedSlots = slotOrder.filter(slot => groupedShifts.has(slot));
+        for (const slot of sortedSlots) {
+            shiftsText += `  *${slotLabel(slot, lang)}:*\n`;
+            shiftsText += groupedShifts.get(slot)!.map((name) => `    • ${name}`).join('\n') + '\n';
+        }
+        shiftsText = shiftsText.trimEnd();
+    }
+
     const lines: string[] = [];
     if (lang === 'ES') {
         lines.push(`📋 *Resumen diario* — ${when}`);
@@ -188,12 +265,7 @@ function msgAdminDigest(params: {
                     : `  ${none}`),
         );
         lines.push('');
-        lines.push(
-            `*Turnos de vigilancia (${data.shifts.length}):*\n` +
-                (data.shifts.length
-                    ? data.shifts.map((s) => `  • ${s.name} — ${slotLabel(s.slot, lang)}`).join('\n')
-                    : `  ${none}`),
-        );
+        lines.push(`*Turnos de vigilancia (${data.shifts.length}):*\n${shiftsText}`);
     } else {
         lines.push(`📋 *Daily digest* — ${when}`);
         lines.push('');
@@ -211,12 +283,7 @@ function msgAdminDigest(params: {
                     : `  ${none}`),
         );
         lines.push('');
-        lines.push(
-            `*Night watch shifts (${data.shifts.length}):*\n` +
-                (data.shifts.length
-                    ? data.shifts.map((s) => `  • ${s.name} — ${slotLabel(s.slot, lang)}`).join('\n')
-                    : `  ${none}`),
-        );
+        lines.push(`*Shifts (${data.shifts.length}):*\n${shiftsText}`);
     }
     return lines.join('\n');
 }
@@ -276,6 +343,85 @@ async function sendReminder(params: {
 }
 
 // ── The actual job ────────────────────────────────────────────
+
+/**
+ * Send an instant WhatsApp confirmation when an assignment is created.
+ * Notifies the volunteer (their room details) and the house owner
+ * (new guest arriving). Both sends are idempotent via ReminderLog.
+ */
+export async function sendAssignmentConfirmation(assignmentId: string): Promise<void> {
+    const assignment = await prisma.assignment.findUnique({
+        where: { id: assignmentId },
+        include: {
+            volunteer: { select: { name: true, phone: true, language: true } },
+            room: {
+                include: {
+                    house: {
+                        include: {
+                            owner: { select: { name: true, phone: true, language: true } },
+                        },
+                    },
+                },
+            },
+        },
+    });
+    if (!assignment) return;
+
+    const { volunteer, room } = assignment as unknown as {
+        volunteer: { name: string; phone: string | null; language: Language | null };
+        room: {
+            name: string;
+            house: {
+                name: string;
+                address: string;
+                owner: { name: string; phone: string | null; language: Language | null } | null;
+            };
+        };
+    };
+
+    const house = room.house;
+
+    // ── Volunteer confirmation ───────────────────────────────
+    if (volunteer.phone) {
+        const lang = volunteer.language ?? DEFAULT_LANG;
+        const text = await msgAssignmentConfirmation({
+            volunteerName: volunteer.name,
+            houseName: house.name,
+            houseAddress: house.address,
+            roomName: room.name,
+            startDate: assignment.startDate,
+            endDate: assignment.endDate,
+            lang,
+        });
+        await sendReminder({
+            kind: 'ASSIGNMENT_CONFIRMATION',
+            phone: volunteer.phone,
+            referenceId: assignmentId,
+            text,
+        });
+    }
+
+    // ── House owner notification ─────────────────────────────
+    if (house.owner?.phone) {
+        const lang = house.owner.language ?? DEFAULT_LANG;
+        const text = await msgOwnerNotification({
+            ownerName: house.owner.name,
+            volunteerName: volunteer.name,
+            houseName: house.name,
+            roomName: room.name,
+            startDate: assignment.startDate,
+            endDate: assignment.endDate,
+            lang,
+        });
+        await sendReminder({
+            kind: 'ASSIGNMENT_CONFIRMATION',
+            phone: house.owner.phone,
+            // distinct referenceId so owner + volunteer don't collide in the log
+            referenceId: `owner-${assignmentId}`,
+            text,
+        });
+    }
+}
 
 export type ReminderRunSummary = {
     date: string;
@@ -339,7 +485,7 @@ export async function runDailyReminders(now: Date = new Date()): Promise<Reminde
     }>) {
         if (!s.volunteer.phone) continue;
         const lang = s.volunteer.language ?? DEFAULT_LANG;
-        const text = msgWatchmanShift({
+        const text = await msgWatchmanShift({
             name: s.volunteer.name,
             date: today,
             slot: s.slot,
@@ -369,7 +515,7 @@ export async function runDailyReminders(now: Date = new Date()): Promise<Reminde
         });
         if (!a.volunteer.phone) continue;
         const lang = a.volunteer.language ?? DEFAULT_LANG;
-        const text = msgVolunteerArrival({
+        const text = await msgVolunteerArrival({
             name: a.volunteer.name,
             houseName: a.room.house.name,
             houseAddress: a.room.house.address,
@@ -400,7 +546,7 @@ export async function runDailyReminders(now: Date = new Date()): Promise<Reminde
         });
         if (!a.volunteer.phone) continue;
         const lang = a.volunteer.language ?? DEFAULT_LANG;
-        const text = msgVolunteerDeparture({
+        const text = await msgVolunteerDeparture({
             name: a.volunteer.name,
             houseName: a.room.house.name,
             roomName: a.room.name,

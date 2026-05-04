@@ -1,87 +1,95 @@
 'use client';
 
-import { createHouse, createRoom, deleteHouse, deleteRoom } from '@/actions/housing';
 import type { UserRole } from '@/lib/auth';
 import { useTranslation } from '@/i18n/LanguageContext';
-import { useState } from 'react';
-import HousesPdfButton from './HousesPdfButton';
 import MyScheduleCard, { type MyAssignment, type MyShift } from './MyScheduleCard';
+import { SHIFT_SLOT_TIMES } from '@/lib/watchman';
+import type { ShiftSlot } from '@prisma/client';
+import Link from 'next/link';
 
-type HouseWithRooms = {
+export type WatchShift = {
     id: string;
-    name: string;
-    address: string;
-    acceptedTypes: string[];
-    rooms: {
-        id: string;
-        name: string;
-        capacity: number;
-        assignments: {
-            id: string;
-            volunteer: { id: string; name: string; type: string };
-        }[];
-    }[];
+    date: string; // ISO
+    slot: ShiftSlot;
+    notes: string | null;
+    watchmanName: string;
+    watchmanPhone: string | null;
+    partners: { name: string; phone: string | null }[];
 };
 
-function typeBadgeClass(type: string) {
-    switch (type) {
-        case 'SINGLE_BROTHER': return 'type-badge single-brother';
-        case 'SINGLE_SISTER': return 'type-badge single-sister';
-        case 'MARRIED_COUPLE': return 'type-badge married-couple';
-        default: return 'type-badge';
+// Group shifts by date for the calendar-style display
+function groupByDate(shifts: WatchShift[]): Map<string, WatchShift[]> {
+    const map = new Map<string, WatchShift[]>();
+    for (const s of shifts) {
+        const day = s.date.slice(0, 10); // YYYY-MM-DD
+        if (!map.has(day)) map.set(day, []);
+        map.get(day)!.push(s);
     }
+    return map;
 }
 
+const SLOT_ICONS: Record<string, string> = {
+    MORNING: '🌅',
+    LUNCH: '☀️',
+    AFTERNOON: '🌤️',
+    EVENING: '🌆',
+    OVERNIGHT: '🌙',
+};
+
 export default function DashboardClient({
-    houses,
+    houseCount,
     volunteerCount,
     activeAssignments,
-    totalBeds,
-    maxCapacity,
     role,
     userName,
     identityType,
     myShifts,
     myAssignments,
+    watchShifts,
 }: {
-    houses: HouseWithRooms[];
+    houseCount: number;
     volunteerCount: number;
     activeAssignments: number;
-    totalBeds: number;
-    maxCapacity: number;
     role: UserRole;
     userName: string | null;
     identityType: 'WATCHMAN' | 'VOLUNTEER' | null;
     myShifts: MyShift[];
     myAssignments: MyAssignment[];
+    watchShifts: WatchShift[];
 }) {
-    const isAdmin = role === 'admin';
-    const { t } = useTranslation();
-    const [showHouseForm, setShowHouseForm] = useState(false);
-    const [expandedHouse, setExpandedHouse] = useState<string | null>(null);
-    const [error, setError] = useState('');
+    const { locale, t } = useTranslation();
+    const dateLocale = locale === 'es' ? 'es' : 'en-US';
 
-    function typeLabel(type: string) {
-        switch (type) {
-            case 'SINGLE_BROTHER': return t.types.singleBrother;
-            case 'SINGLE_SISTER': return t.types.singleSister;
-            case 'MARRIED_COUPLE': return t.types.marriedCouple;
-            default: return type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    function slotLabel(slot: ShiftSlot): string {
+        const labels = t.watchman.slots;
+        switch (slot) {
+            case 'MORNING': return labels.morning;
+            case 'LUNCH': return labels.lunch;
+            case 'AFTERNOON': return labels.afternoon;
+            case 'EVENING': return labels.evening;
+            case 'OVERNIGHT': return labels.overnight;
+            default: return slot;
         }
     }
 
-    async function handleCreateHouse(formData: FormData) {
-        setError('');
-        const result = await createHouse(formData);
-        if (result?.error) setError(result.error);
-        else setShowHouseForm(false);
+    function formatDay(iso: string): string {
+        return new Date(iso).toLocaleDateString(dateLocale, {
+            weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC',
+        });
     }
 
-    async function handleCreateRoom(formData: FormData) {
-        setError('');
-        const result = await createRoom(formData);
-        if (result?.error) setError(result.error);
+    function isToday(iso: string): boolean {
+        const today = new Date();
+        const d = new Date(iso + 'T00:00:00Z');
+        return (
+            d.getUTCFullYear() === today.getUTCFullYear() &&
+            d.getUTCMonth() === today.getUTCMonth() &&
+            d.getUTCDate() === today.getUTCDate()
+        );
     }
+
+    const grouped = groupByDate(watchShifts);
+    const days = Array.from(grouped.keys()).sort();
 
     return (
         <div className="animate-fade-in">
@@ -90,8 +98,7 @@ export default function DashboardClient({
                 <p>{t.dashboard.subtitle}</p>
             </div>
 
-            {/* Personalized schedule (shown for everyone, so admins see their own
-                shifts at a glance too). Skipped if no identity is attached. */}
+            {/* Personalized schedule card */}
             {userName && identityType && (
                 <MyScheduleCard
                     userName={userName}
@@ -105,15 +112,7 @@ export default function DashboardClient({
             <div className="stats-grid">
                 <div className="glass-panel stat-card">
                     <span className="stat-label">{t.dashboard.totalHouses}</span>
-                    <span className="stat-value accent">{houses.length}</span>
-                </div>
-                <div className="glass-panel stat-card">
-                    <span className="stat-label">{t.dashboard.totalBeds}</span>
-                    <span className="stat-value">{totalBeds}</span>
-                </div>
-                <div className="glass-panel stat-card">
-                    <span className="stat-label">{t.dashboard.maxCapacity}</span>
-                    <span className="stat-value accent">{maxCapacity}</span>
+                    <span className="stat-value accent">{houseCount}</span>
                 </div>
                 <div className="glass-panel stat-card">
                     <span className="stat-label">{t.dashboard.activeAssignments}</span>
@@ -125,166 +124,162 @@ export default function DashboardClient({
                 </div>
             </div>
 
-            {error && <div className="alert alert-error">{error}</div>}
-
-            {/* Add House */}
+            {/* ── Night Watchman Schedule at a Glance ─────────────── */}
             <div className="section">
-                <div className="section-header">
-                    <h2>{t.dashboard.houses}</h2>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                        <HousesPdfButton houses={houses} />
-                        {isAdmin && (
-                            <button className="btn btn-primary" onClick={() => setShowHouseForm(!showHouseForm)}>
-                                {showHouseForm ? t.dashboard.cancel : t.dashboard.addHouse}
-                            </button>
-                        )}
+                <div className="section-header" style={{ marginBottom: 16 }}>
+                    <div>
+                        <h2 style={{ margin: 0 }}>{t.dashboard.watchScheduleTitle}</h2>
+                        <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>
+                            {t.dashboard.watchScheduleSubtitle}
+                        </p>
                     </div>
+                    <Link
+                        href="/watchman"
+                        className="btn btn-sm"
+                        style={{ border: '1px solid var(--border-color)', color: 'var(--accent-secondary)', whiteSpace: 'nowrap' }}
+                    >
+                        {t.dashboard.viewFullSchedule}
+                    </Link>
                 </div>
 
-                {isAdmin && showHouseForm && (
-                    <div className="glass-panel form-card">
-                        <h3>{t.dashboard.newHouse}</h3>
-                        <form action={handleCreateHouse}>
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label htmlFor="house-name">{t.dashboard.name}</label>
-                                    <input id="house-name" name="name" placeholder={t.dashboard.namePlaceholder} required />
-                                </div>
-                                <div className="form-group">
-                                    <label htmlFor="house-address">{t.dashboard.address}</label>
-                                    <input id="house-address" name="address" placeholder={t.dashboard.addressPlaceholder} required />
-                                </div>
-                            </div>
-                            <div className="form-group" style={{ marginBottom: 16 }}>
-                                <label>{t.dashboard.acceptedVolunteerTypes}</label>
-                                <div className="checkbox-group">
-                                    <label>
-                                        <input type="checkbox" name="acceptedTypes" value="SINGLE_BROTHER" />
-                                        {t.types.singleBrother}
-                                    </label>
-                                    <label>
-                                        <input type="checkbox" name="acceptedTypes" value="SINGLE_SISTER" />
-                                        {t.types.singleSister}
-                                    </label>
-                                    <label>
-                                        <input type="checkbox" name="acceptedTypes" value="MARRIED_COUPLE" />
-                                        {t.types.marriedCouple}
-                                    </label>
-                                </div>
-                            </div>
-                            <button type="submit" className="btn btn-primary">{t.dashboard.createHouse}</button>
-                        </form>
-                    </div>
-                )}
-
-                {/* House Cards */}
-                {houses.length === 0 ? (
+                {days.length === 0 ? (
                     <div className="glass-panel empty-state">
-                        <div className="empty-icon">🏡</div>
-                        <h3>{t.dashboard.noHousesYet}</h3>
-                        <p>{t.dashboard.noHousesDesc}</p>
+                        <div className="empty-icon">🌙</div>
+                        <h3>{t.dashboard.noShiftsTonight}</h3>
+                        <p>{t.dashboard.noShiftsTonightDesc}</p>
                     </div>
                 ) : (
-                    <div className="houses-grid">
-                        {houses.map((house) => {
-                            const totalRoomCap = house.rooms.reduce((s, r) => s + r.capacity, 0);
-                            const totalAssigned = house.rooms.reduce((s, r) => s + r.assignments.length, 0);
-                            const isExpanded = expandedHouse === house.id;
-
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                        {days.map((day) => {
+                            const shifts = grouped.get(day)!;
+                            const today = isToday(day);
                             return (
-                                <div key={house.id} className="glass-panel house-card">
-                                    <div className="house-card-header">
-                                        <div>
-                                            <h3>{house.name}</h3>
-                                            <div className="address">{house.address}</div>
-                                        </div>
-                                        {isAdmin && (
-                                            <button
-                                                className="btn btn-danger btn-sm"
-                                                onClick={() => deleteHouse(house.id)}
-                                            >
-                                                {t.dashboard.delete}
-                                            </button>
+                                <div
+                                    key={day}
+                                    className="glass-panel"
+                                    style={{
+                                        padding: '16px 20px',
+                                        borderLeft: today ? '3px solid var(--accent-primary)' : '3px solid transparent',
+                                    }}
+                                >
+                                    {/* Day Header */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                                        <span style={{
+                                            fontWeight: 700,
+                                            fontSize: '0.95rem',
+                                            color: today ? 'var(--accent-primary)' : 'var(--text-primary)',
+                                        }}>
+                                            {formatDay(day)}
+                                        </span>
+                                        {today && (
+                                            <span style={{
+                                                fontSize: '0.7rem',
+                                                fontWeight: 700,
+                                                padding: '2px 8px',
+                                                borderRadius: 99,
+                                                background: 'var(--accent-primary)',
+                                                color: '#fff',
+                                                letterSpacing: '0.05em',
+                                                textTransform: 'uppercase',
+                                            }}>
+                                                {t.dashboard.tonightsWatch}
+                                            </span>
                                         )}
                                     </div>
 
-                                    <div className="accepted-types">
-                                        {house.acceptedTypes.map((tp) => (
-                                            <span key={tp} className={typeBadgeClass(tp)}>
-                                                {typeLabel(tp)}
-                                            </span>
+                                    {/* Shifts for this day */}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                        {shifts.map((shift) => (
+                                            <div
+                                                key={shift.id}
+                                                style={{
+                                                    display: 'grid',
+                                                    gridTemplateColumns: 'auto 1fr auto',
+                                                    alignItems: 'center',
+                                                    gap: '0 16px',
+                                                    padding: '10px 14px',
+                                                    background: 'rgba(255,255,255,0.04)',
+                                                    border: '1px solid var(--border-color)',
+                                                    borderRadius: 10,
+                                                }}
+                                            >
+                                                {/* Slot label */}
+                                                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 120 }}>
+                                                    <span style={{ fontSize: '0.8rem', color: 'var(--accent-secondary)', fontWeight: 600 }}>
+                                                        {SLOT_ICONS[shift.slot]} {slotLabel(shift.slot)}
+                                                    </span>
+                                                    <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', marginTop: 2 }}>
+                                                        {SHIFT_SLOT_TIMES[shift.slot]}
+                                                    </span>
+                                                </div>
+
+                                                {/* Watchman + partner */}
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                                    {/* Primary watchman */}
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                                        <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                                                            {shift.watchmanName}
+                                                        </span>
+                                                        {shift.watchmanPhone && (
+                                                            <a
+                                                                href={`tel:${shift.watchmanPhone}`}
+                                                                style={{
+                                                                    fontSize: '0.78rem',
+                                                                    color: 'var(--text-tertiary)',
+                                                                    textDecoration: 'none',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    gap: 3,
+                                                                }}
+                                                            >
+                                                                📞 {shift.watchmanPhone}
+                                                            </a>
+                                                        )}
+                                                    </div>
+                                                    {/* Partner(s) */}
+                                                    {shift.partners.length > 0 && (
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                                            <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', fontWeight: 500 }}>
+                                                                {t.dashboard.partner}:
+                                                            </span>
+                                                            {shift.partners.map((p, i) => (
+                                                                <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                                    <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                                                                        {p.name}
+                                                                    </span>
+                                                                    {p.phone && (
+                                                                        <a
+                                                                            href={`tel:${p.phone}`}
+                                                                            style={{
+                                                                                fontSize: '0.75rem',
+                                                                                color: 'var(--text-tertiary)',
+                                                                                textDecoration: 'none',
+                                                                            }}
+                                                                        >
+                                                                            📞 {p.phone}
+                                                                        </a>
+                                                                    )}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Notes */}
+                                                {shift.notes && (
+                                                    <div style={{
+                                                        fontSize: '0.75rem',
+                                                        color: 'var(--text-tertiary)',
+                                                        fontStyle: 'italic',
+                                                        textAlign: 'right',
+                                                        maxWidth: 160,
+                                                    }}>
+                                                        {shift.notes}
+                                                    </div>
+                                                )}
+                                            </div>
                                         ))}
                                     </div>
-
-                                    <div style={{ fontSize: '0.825rem', color: 'var(--text-tertiary)', marginBottom: 12 }}>
-                                        {totalAssigned} / {totalRoomCap} {t.dashboard.bedsOccupied} · {house.rooms.length} {house.rooms.length !== 1 ? t.dashboard.rooms : t.dashboard.room}
-                                    </div>
-
-                                    <div className="room-list">
-                                        {house.rooms.map((room) => {
-                                            const pct = room.capacity > 0 ? (room.assignments.length / room.capacity) * 100 : 0;
-                                            const fillClass = pct >= 100 ? 'full' : pct >= 50 ? 'mid' : 'low';
-
-                                            return (
-                                                <div key={room.id} className="room-item">
-                                                    <div>
-                                                        <span className="room-name">{room.name}</span>
-                                                        {room.assignments.length > 0 && (
-                                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: 2 }}>
-                                                                {room.assignments.map((a) => a.volunteer.name).join(', ')}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    <div style={{ display: 'flex', alignItems: 'center' }}>
-                                                        <span className="room-occupancy">
-                                                            {room.assignments.length}/{room.capacity}
-                                                        </span>
-                                                        <div className="occupancy-bar">
-                                                            <div className={`fill ${fillClass}`} style={{ width: `${Math.min(pct, 100)}%` }} />
-                                                        </div>
-                                                        {isAdmin && (
-                                                            <button
-                                                                className="btn btn-danger btn-sm"
-                                                                style={{ marginLeft: 8 }}
-                                                                onClick={() => deleteRoom(room.id)}
-                                                            >
-                                                                ✕
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-
-                                    {/* Add Room form */}
-                                    {isAdmin && (
-                                        <div style={{ marginTop: 12 }}>
-                                            {isExpanded ? (
-                                                <form action={handleCreateRoom} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                                                    <input type="hidden" name="houseId" value={house.id} />
-                                                    <div className="form-group" style={{ flex: 1, minWidth: 0 }}>
-                                                        <label>{t.dashboard.roomName}</label>
-                                                        <input name="name" placeholder={t.dashboard.roomNamePlaceholder} required style={{ padding: '8px 10px', fontSize: '0.825rem' }} />
-                                                    </div>
-                                                    <div className="form-group" style={{ width: 80 }}>
-                                                        <label>{t.dashboard.beds}</label>
-                                                        <input name="capacity" type="number" min="1" defaultValue="1" required style={{ padding: '8px 10px', fontSize: '0.825rem' }} />
-                                                    </div>
-                                                    <button type="submit" className="btn btn-primary btn-sm">{t.dashboard.add}</button>
-                                                    <button type="button" className="btn btn-danger btn-sm" onClick={() => setExpandedHouse(null)}>✕</button>
-                                                </form>
-                                            ) : (
-                                                <button
-                                                    className="btn btn-primary btn-sm"
-                                                    style={{ width: '100%' }}
-                                                    onClick={() => setExpandedHouse(house.id)}
-                                                >
-                                                    {t.dashboard.addRoom}
-                                                </button>
-                                            )}
-                                        </div>
-                                    )}
                                 </div>
                             );
                         })}

@@ -4,12 +4,14 @@ import { requireAdmin } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { VolunteerType } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
+import { sendAssignmentConfirmation } from '@/lib/reminders';
 
 // ─── Houses ──────────────────────────────────────────
 
 export async function getHouses() {
     return prisma.house.findMany({
         include: {
+            owner: { select: { id: true, name: true, phone: true } },
             rooms: {
                 include: {
                     assignments: {
@@ -32,16 +34,16 @@ export async function createHouse(formData: FormData) {
     const name = formData.get('name') as string;
     const address = formData.get('address') as string;
     const acceptedTypes = formData.getAll('acceptedTypes') as VolunteerType[];
+    const ownerId = (formData.get('ownerId') as string | null) || null;
 
     if (!name || !address || acceptedTypes.length === 0) {
         return { error: 'All fields are required.' };
     }
 
     await prisma.house.create({
-        data: { name, address, acceptedTypes },
+        data: { name, address, acceptedTypes, ...(ownerId ? { ownerId } : {}) },
     });
 
-    revalidatePath('/');
     revalidatePath('/planning');
     return { success: true };
 }
@@ -51,7 +53,19 @@ export async function deleteHouse(id: string) {
     if (authError) return { error: authError };
 
     await prisma.house.delete({ where: { id } });
-    revalidatePath('/');
+    revalidatePath('/planning');
+    return { success: true };
+}
+
+export async function updateHouseOwner(houseId: string, ownerId: string | null) {
+    const authError = await requireAdmin();
+    if (authError) return { error: authError };
+
+    await prisma.house.update({
+        where: { id: houseId },
+        data: { ownerId },
+    });
+
     revalidatePath('/planning');
     return { success: true };
 }
@@ -84,7 +98,6 @@ export async function deleteRoom(id: string) {
     if (authError) return { error: authError };
 
     await prisma.room.delete({ where: { id } });
-    revalidatePath('/');
     revalidatePath('/planning');
     return { success: true };
 }
@@ -233,11 +246,16 @@ export async function createAssignment(formData: FormData) {
         return { error: 'This room is already at full capacity for the selected dates.' };
     }
 
-    await prisma.assignment.create({
+    const newAssignment = await prisma.assignment.create({
         data: { volunteerId, roomId, startDate, endDate },
     });
 
-    revalidatePath('/');
+    // Fire-and-forget: notify the volunteer and the house owner via WhatsApp.
+    // A WhatsApp failure must never block the assignment from being saved.
+    sendAssignmentConfirmation(newAssignment.id).catch((err) =>
+        console.error('[createAssignment] confirmation send failed', err)
+    );
+
     revalidatePath('/planning');
     return { success: true };
 }

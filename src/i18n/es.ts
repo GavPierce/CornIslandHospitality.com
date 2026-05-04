@@ -15,7 +15,7 @@ const es: Translations = {
   // Dashboard
   dashboard: {
     title: 'Panel',
-    subtitle: 'Resumen de todas las casas, habitaciones y ocupación actual',
+    subtitle: 'Horario de voluntarios y resumen del ministerio',
     totalHouses: 'Total de Casas',
     totalBeds: 'Total de Camas',
     maxCapacity: 'Capacidad Máxima',
@@ -43,6 +43,15 @@ const es: Translations = {
     beds: 'Camas',
     add: 'Agregar',
     addRoom: '+ Agregar Habitación',
+    watchScheduleTitle: 'Horario de Vigilantes',
+    watchScheduleSubtitle: 'Quién está de turno esta noche y próximamente',
+    noShiftsTonight: 'No hay turnos programados esta noche',
+    noShiftsTonightDesc: 'Agrega turnos en la página de Vigilante Nocturno.',
+    tonightsWatch: 'Turno de Esta Noche',
+    partner: 'Compañero',
+    noPartner: 'Solo',
+    viewFullSchedule: 'Horario Completo →',
+    upcomingShifts: 'Próximos turnos (7 días)',
   },
 
   // Volunteers
@@ -88,7 +97,7 @@ const es: Translations = {
     assignVolunteer: 'Asignar Voluntario',
     currentAssignments: 'Asignaciones Actuales',
     noHouses: 'No hay casas disponibles',
-    noHousesDesc: 'Crea casas y habitaciones en el Panel primero.',
+    noHousesDesc: 'Agrega una casa arriba para comenzar a gestionar alojamientos.',
     noRoomsYet: 'Aún no se han agregado habitaciones.',
     beds: 'camas',
     unassignedVolunteers: 'Voluntarios Sin Asignar',
@@ -107,7 +116,7 @@ const es: Translations = {
     house: 'Casa',
     allHouses: 'Todas las Casas',
     noRooms: 'No hay habitaciones para mostrar',
-    noRoomsDesc: 'Agrega casas y habitaciones en el Panel primero.',
+    noRoomsDesc: 'Agrega casas y habitaciones en la página de Planificación primero.',
     roomCol: 'Habitación',
   },
 

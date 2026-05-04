@@ -32,6 +32,8 @@ model House {
   name             String
   address          String
   acceptedTypes    VolunteerType[] // e.g. [SINGLE_SISTER, MARRIED_COUPLE]
+  ownerId          String?         // optional link to the volunteer who owns/hosts this house
+  owner            Volunteer?      @relation("HouseOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   rooms            Room[]
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
@@ -58,6 +60,7 @@ model Volunteer {
   isWatchman    Boolean       @default(false) // also stands night-watch shifts
   assignments   Assignment[]
   shifts        WatchmanShift[]
+  ownedHouses   House[]       @relation("HouseOwner")
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 }
@@ -131,10 +134,11 @@ model AuthSession {
 // ─── WhatsApp reminders ──────────────────────────────────
 
 enum ReminderKind {
-  WATCHMAN_SHIFT        // day-of reminder to the watchman
-  VOLUNTEER_ARRIVAL     // day-of welcome to the volunteer
-  VOLUNTEER_DEPARTURE   // day-of checkout reminder to the volunteer
-  ADMIN_DAILY_DIGEST    // daily summary to each admin phone
+  WATCHMAN_SHIFT           // day-of reminder to the watchman
+  VOLUNTEER_ARRIVAL        // day-of welcome to the volunteer
+  VOLUNTEER_DEPARTURE      // day-of checkout reminder to the volunteer
+  ADMIN_DAILY_DIGEST       // daily summary to each admin phone
+  ASSIGNMENT_CONFIRMATION  // instant confirmation when a room is assigned
 }
 
 /**
