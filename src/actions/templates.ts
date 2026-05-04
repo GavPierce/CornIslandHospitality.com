@@ -3,11 +3,6 @@
 import { requireAdmin } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
-export async function getTemplate(key: string): Promise<string | null> {
-    const row = await prisma.appSetting.findUnique({ where: { key } });
-    return row?.value ?? null;
-}
-
 export async function getAllTemplates(): Promise<Record<string, string>> {
     await requireAdmin();
     const rows = await prisma.appSetting.findMany({

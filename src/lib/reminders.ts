@@ -71,7 +71,7 @@ function formatLongDate(d: Date, lang: Language): string {
 
 // ── Message templates ─────────────────────────────────────────
 
-import { getTemplate } from '@/actions/templates';
+import { getMessageTemplate } from '@/lib/settings';
 
 function slotLabel(slot: ShiftSlot, lang: Language): string {
     const map: Record<ShiftSlot, { en: string; es: string }> = {
@@ -94,7 +94,7 @@ async function msgWatchmanShift(params: {
     const when = formatLongDate(date, lang);
     const slotText = slotLabel(slot, lang);
     
-    let template = await getTemplate(`template.WATCHMAN_SHIFT.${lang}`);
+    let template = await getMessageTemplate(`template.WATCHMAN_SHIFT.${lang}`);
     if (!template) {
         template = lang === 'ES'
             ? `👷 *Recordatorio de turno* — Hola {name}!\n\nTienes tu turno de vigilancia *hoy ({date})*.\nHorario: {slot}.\n\nGracias por tu servicio. — Corn Island Hospitality`
@@ -118,7 +118,7 @@ async function msgVolunteerArrival(params: {
     const { name, houseName, houseAddress, roomName, endDate, lang } = params;
     const until = formatLongDate(endDate, lang);
     
-    let template = await getTemplate(`template.VOLUNTEER_ARRIVAL.${lang}`);
+    let template = await getMessageTemplate(`template.VOLUNTEER_ARRIVAL.${lang}`);
     if (!template) {
         template = lang === 'ES'
             ? `🏠 *¡Bienvenido/a, {name}!*\n\nHoy comienza tu estadía en *{houseName}* ({houseAddress}).\nHabitación: *{roomName}*.\nFecha de salida prevista: *{endDate}*.\n\nSi necesitas ayuda, contacta a tu coordinador. — Corn Island Hospitality`
@@ -141,7 +141,7 @@ async function msgVolunteerDeparture(params: {
 }): Promise<string> {
     const { name, houseName, roomName, lang } = params;
     
-    let template = await getTemplate(`template.VOLUNTEER_DEPARTURE.${lang}`);
+    let template = await getMessageTemplate(`template.VOLUNTEER_DEPARTURE.${lang}`);
     if (!template) {
         template = lang === 'ES'
             ? `👋 *Último día* — Hola {name}!\n\nHoy es tu último día en *{houseName}* (habitación {roomName}).\nPor favor, deja la habitación limpia antes de salir. ¡Gracias por tu visita!\n\n— Corn Island Hospitality`
@@ -167,7 +167,7 @@ async function msgAssignmentConfirmation(params: {
     const from = formatLongDate(startDate, lang);
     const to = formatLongDate(endDate, lang);
     
-    let template = await getTemplate(`template.ASSIGNMENT_CONFIRMATION.${lang}`);
+    let template = await getMessageTemplate(`template.ASSIGNMENT_CONFIRMATION.${lang}`);
     if (!template) {
         template = lang === 'ES'
             ? `🏠 *Alojamiento confirmado — ¡Hola {volunteerName}!*\n\nSe te ha asignado una habitación en *{houseName}* ({houseAddress}).\nHabitación: *{roomName}*.\nFechas: {startDate} → {endDate}.\n\nSi tienes alguna pregunta, comunícate con tu coordinador.\n— Corn Island Hospitality`
@@ -196,7 +196,7 @@ async function msgOwnerNotification(params: {
     const from = formatLongDate(startDate, lang);
     const to = formatLongDate(endDate, lang);
     
-    let template = await getTemplate(`template.OWNER_NOTIFICATION.${lang}`);
+    let template = await getMessageTemplate(`template.OWNER_NOTIFICATION.${lang}`);
     if (!template) {
         template = lang === 'ES'
             ? `🏡 *Nuevo huésped — Hola {ownerName}!*\n\n*{volunteerName}* ha sido asignado/a a una habitación en tu casa (*{houseName}*).\nHabitación: *{roomName}*.\nFechas: {startDate} → {endDate}.\n\n— Corn Island Hospitality`

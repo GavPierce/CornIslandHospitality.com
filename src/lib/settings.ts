@@ -37,3 +37,12 @@ export async function getRemindersEnabled(): Promise<boolean> {
 export async function setRemindersEnabled(enabled: boolean): Promise<void> {
     await writeSetting(KEY_REMINDERS_ENABLED, enabled ? 'true' : 'false');
 }
+
+/**
+ * Look up a message template by key (e.g. `template.WATCHMAN_SHIFT.EN`).
+ * Returns `null` when no custom override has been saved, which tells
+ * the caller to use the built-in default.
+ */
+export async function getMessageTemplate(key: string): Promise<string | null> {
+    return readSetting(key);
+}
