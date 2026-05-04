@@ -1,12 +1,9 @@
 'use client';
 
 import {
-    createWatchman,
     createWatchmanShift,
-    deleteWatchman,
     deleteWatchmanShift,
     getWatchmanShifts,
-    updateWatchman,
 } from '@/actions/watchman';
 import type { UserRole } from '@/lib/auth';
 import { useTranslation } from '@/i18n/LanguageContext';
@@ -78,8 +75,6 @@ export default function WatchmanClient({
     const [year, setYear] = useState(initialYear);
     const [month, setMonth] = useState(initialMonth);
     const [shifts, setShifts] = useState<Shift[]>(initialShifts);
-    const [showPersonForm, setShowPersonForm] = useState(false);
-    const [editingId, setEditingId] = useState<string | null>(null);
     const [selectedDay, setSelectedDay] = useState<number | null>(null);
     const [error, setError] = useState('');
     const [, startTransition] = useTransition();
@@ -168,13 +163,6 @@ export default function WatchmanClient({
         setSelectedDay(null);
     }
 
-    async function handleCreatePerson(formData: FormData) {
-        setError('');
-        const result = await createWatchman(formData);
-        if (result?.error) setError(result.error);
-        else setShowPersonForm(false);
-    }
-
     async function handleAssign(formData: FormData) {
         setError('');
         const result = await createWatchmanShift(formData);
@@ -194,32 +182,6 @@ export default function WatchmanClient({
             return;
         }
         setShifts((prev) => prev.filter((s) => s.id !== id));
-    }
-
-    async function handleUpdatePerson(formData: FormData) {
-        setError('');
-        const result = await updateWatchman(formData);
-        if (result?.error) {
-            setError(result.error);
-            return;
-        }
-        setEditingId(null);
-        // Refresh the page so the watchmen list reflects the new contact info.
-        startTransition(async () => {
-            const fresh = await getWatchmanShifts(year, month);
-            setShifts(fresh as Shift[]);
-        });
-    }
-
-    async function handleDeletePerson(id: string) {
-        const result = await deleteWatchman(id);
-        if (result?.error) {
-            setError(result.error);
-            return;
-        }
-        // Shifts will have been cascaded; refresh for this month
-        const fresh = await getWatchmanShifts(year, month);
-        setShifts(fresh as Shift[]);
     }
 
     const weekdayLabels =
@@ -614,197 +576,30 @@ export default function WatchmanClient({
 
                         {isAdmin && watchmen.length === 0 && (
                             <p style={{ color: 'var(--text-tertiary)' }}>
-                                {t.watchman.addSomeoneFirst}
+                                <a href="/volunteers" style={{ color: 'inherit', textDecoration: 'underline' }}>
+                                    Add watchmen on the Volunteers page
+                                </a> first, then assign them to shifts.
                             </p>
                         )}
                     </div>
                 )}
             </div>
 
-                        {/* ─── People Section ───────────────────────── */}
             <div className="section">
                 <div className="section-header">
-                    <h2>
-                        {watchmen.length}{' '}
-                        {watchmen.length !== 1
-                            ? t.watchman.watchmanPlural
-                            : t.watchman.watchman}
-                    </h2>
+                    <h2>People</h2>
                     {isAdmin && (
-                        <button
-                            className="btn btn-primary"
-                            onClick={() => setShowPersonForm(!showPersonForm)}
-                        >
-                            {showPersonForm
-                                ? t.watchman.cancel
-                                : t.watchman.addWatchman}
-                        </button>
+                        <a href="/volunteers" className="btn btn-secondary">
+                            Manage people
+                        </a>
                     )}
                 </div>
-
-                {isAdmin && showPersonForm && (
-                    <div className="glass-panel form-card">
-                        <h3>{t.watchman.newWatchman}</h3>
-                        <form action={handleCreatePerson}>
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label htmlFor="wm-name">
-                                        {t.watchman.fullName}
-                                    </label>
-                                    <input
-                                        id="wm-name"
-                                        name="name"
-                                        placeholder={
-                                            t.watchman.fullNamePlaceholder
-                                        }
-                                        required
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label htmlFor="wm-phone">
-                                        {t.watchman.phoneOptional}
-                                    </label>
-                                    <input
-                                        id="wm-phone"
-                                        name="phone"
-                                        type="tel"
-                                        placeholder={
-                                            t.watchman.phonePlaceholder
-                                        }
-                                    />
-                                </div>
-                            </div>
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label htmlFor="wm-email">
-                                        {t.watchman.emailOptional}
-                                    </label>
-                                    <input
-                                        id="wm-email"
-                                        name="email"
-                                        type="email"
-                                        placeholder={
-                                            t.watchman.emailPlaceholder
-                                        }
-                                    />
-                                </div>
-                            </div>
-                            <button type="submit" className="btn btn-primary">
-                                {t.watchman.addWatchmanBtn}
-                            </button>
-                        </form>
-                    </div>
-                )}
-
-                {watchmen.length === 0 ? (
-                    <div className="glass-panel empty-state">
-                        <div className="empty-icon">🌙</div>
-                        <h3>{t.watchman.noWatchmen}</h3>
-                        <p>{t.watchman.noWatchmenDesc}</p>
-                    </div>
-                ) : (
-                    <div className="glass-panel data-table-wrapper">
-                        <table className="data-table">
-                            <thead>
-                                <tr>
-                                    <th>{t.watchman.nameCol}</th>
-                                    <th>{t.watchman.contactCol}</th>
-                                    {isAdmin && <th></th>}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {watchmen.map((w) =>
-                                    editingId === w.id ? (
-                                        <tr key={w.id}>
-                                            <td colSpan={isAdmin ? 3 : 2}>
-                                                <form
-                                                    action={handleUpdatePerson}
-                                                    style={{
-                                                        display: 'grid',
-                                                        gap: 8,
-                                                        gridTemplateColumns:
-                                                            '1fr 1fr 1fr auto auto',
-                                                        alignItems: 'center',
-                                                    }}
-                                                >
-                                                    <input type="hidden" name="id" value={w.id} />
-                                                    <input
-                                                        name="name"
-                                                        defaultValue={w.name}
-                                                        required
-                                                        placeholder="Name"
-                                                        className="form-input"
-                                                    />
-                                                    <input
-                                                        name="phone"
-                                                        defaultValue={w.phone ?? ''}
-                                                        placeholder="+50588881111"
-                                                        type="tel"
-                                                        className="form-input"
-                                                    />
-                                                    <input
-                                                        name="email"
-                                                        defaultValue={w.email ?? ''}
-                                                        placeholder="email@example.com"
-                                                        type="email"
-                                                        className="form-input"
-                                                    />
-                                                    <button
-                                                        type="submit"
-                                                        className="btn btn-primary btn-sm"
-                                                    >
-                                                        Save
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-sm"
-                                                        onClick={() => setEditingId(null)}
-                                                    >
-                                                        Cancel
-                                                    </button>
-                                                </form>
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        <tr key={w.id}>
-                                            <td
-                                                style={{
-                                                    color: 'var(--text-primary)',
-                                                    fontWeight: 500,
-                                                }}
-                                            >
-                                                {w.name}
-                                            </td>
-                                            <td>
-                                                {w.email && <div>{w.email}</div>}
-                                                {w.phone && <div>{w.phone}</div>}
-                                                {!w.email && !w.phone && '—'}
-                                            </td>
-                                            {isAdmin && (
-                                                <td style={{ display: 'flex', gap: 8 }}>
-                                                    <button
-                                                        className="btn btn-sm"
-                                                        onClick={() => setEditingId(w.id)}
-                                                    >
-                                                        Edit
-                                                    </button>
-                                                    <button
-                                                        className="btn btn-danger btn-sm"
-                                                        onClick={() =>
-                                                            handleDeletePerson(w.id)
-                                                        }
-                                                    >
-                                                        {t.watchman.delete}
-                                                    </button>
-                                                </td>
-                                            )}
-                                        </tr>
-                                    ),
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
+                <div className="glass-panel" style={{ padding: '16px 20px', color: 'var(--text-secondary)' }}>
+                    <p style={{ margin: 0 }}>
+                        Watchmen are managed on the <a href="/volunteers" style={{ color: 'var(--accent-secondary)' }}>Volunteers page</a>.
+                        Flag volunteers as "Is watchman" to include them in the schedule above.
+                    </p>
+                </div>
             </div>
         </div>
     );

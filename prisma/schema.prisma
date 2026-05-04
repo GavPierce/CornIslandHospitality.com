@@ -55,7 +55,9 @@ model Volunteer {
   phone         String?
   type          VolunteerType
   language      Language?     // preferred language for WhatsApp reminders
+  isWatchman    Boolean       @default(false) // also stands night-watch shifts
   assignments   Assignment[]
+  shifts        WatchmanShift[]
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 }
@@ -75,36 +77,25 @@ model Assignment {
   @@index([volunteerId])
 }
 
-model Watchman {
-  id          String          @id @default(cuid())
-  name        String
-  email       String?
-  phone       String?
-  language    Language?       // preferred language for WhatsApp reminders
-  shifts      WatchmanShift[]
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-}
-
 model WatchmanShift {
   id          String    @id @default(cuid())
-  watchmanId  String
-  watchman    Watchman  @relation(fields: [watchmanId], references: [id], onDelete: Cascade)
+  volunteerId String
+  volunteer   Volunteer @relation(fields: [volunteerId], references: [id], onDelete: Cascade)
   date        DateTime  // The calendar day (stored at 00:00 UTC)
   slot        ShiftSlot @default(EVENING)
   notes       String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  @@unique([watchmanId, date, slot])
+  @@unique([volunteerId, date, slot])
   @@index([date])
-  @@index([watchmanId])
+  @@index([volunteerId])
 }
 
 // ─── Passwordless auth (phone + WhatsApp OTP) ─────────────
 
 enum IdentityType {
-  WATCHMAN
+  WATCHMAN  // deprecated: retained for legacy sessions; new sessions always use VOLUNTEER
   VOLUNTEER
 }
 
@@ -127,7 +118,7 @@ model AuthSession {
   phone        String       // normalized E.164
   name         String       // display name captured at login
   identityType IdentityType
-  identityId   String       // id of the linked Watchman or Volunteer row
+  identityId   String       // id of the linked Volunteer row
   isAdmin      Boolean      @default(false)
   expiresAt    DateTime
   lastSeenAt   DateTime     @default(now())

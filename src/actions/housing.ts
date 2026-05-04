@@ -111,17 +111,20 @@ export async function createVolunteer(formData: FormData) {
     const email = (formData.get('email') as string) || null;
     const phone = (formData.get('phone') as string) || null;
     const type = formData.get('type') as VolunteerType;
+    const isWatchman = formData.get('isWatchman') === 'on'
+        || formData.get('isWatchman') === 'true';
 
     if (!name || !type) {
         return { error: 'Name and type are required.' };
     }
 
     await prisma.volunteer.create({
-        data: { name, email, phone, type },
+        data: { name, email, phone, type, isWatchman },
     });
 
     revalidatePath('/volunteers');
     revalidatePath('/planning');
+    revalidatePath('/watchman');
     return { success: true };
 }
 
@@ -134,6 +137,13 @@ export async function updateVolunteer(formData: FormData) {
     const email = ((formData.get('email') as string) || '').trim() || null;
     const phone = ((formData.get('phone') as string) || '').trim() || null;
     const type = (formData.get('type') as VolunteerType) || undefined;
+    // The checkbox is only present in the form when edited, so treat
+    // its absence as "no change" rather than "set to false". The form
+    // always includes a hidden `isWatchmanPresent=1` so we can tell the
+    // difference between "not rendered" and "rendered + unchecked".
+    const isWatchmanPresent = formData.get('isWatchmanPresent') != null;
+    const isWatchman = formData.get('isWatchman') === 'on'
+        || formData.get('isWatchman') === 'true';
 
     if (!id) return { error: 'Volunteer id is required.' };
     if (!name) return { error: 'Name is required.' };
@@ -145,11 +155,13 @@ export async function updateVolunteer(formData: FormData) {
             email,
             phone,
             ...(type ? { type } : {}),
+            ...(isWatchmanPresent ? { isWatchman } : {}),
         },
     });
 
     revalidatePath('/volunteers');
     revalidatePath('/planning');
+    revalidatePath('/watchman');
     return { success: true };
 }
 
@@ -160,6 +172,7 @@ export async function deleteVolunteer(id: string) {
     await prisma.volunteer.delete({ where: { id } });
     revalidatePath('/volunteers');
     revalidatePath('/planning');
+    revalidatePath('/watchman');
     return { success: true };
 }
 

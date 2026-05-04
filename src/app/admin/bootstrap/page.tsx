@@ -9,7 +9,7 @@ type PageProps = { searchParams: Promise<{ token?: string }> };
 /**
  * First-run admin bootstrap page.
  *
- * This page lets the operator create the very first Watchman row
+ * This page lets the operator create the very first Volunteer row
  * without needing Prisma Studio or direct DB access. Once any user
  * exists, this page locks itself permanently — all further admin
  * management happens through the regular UI.
@@ -40,11 +40,8 @@ export default async function BootstrapPage({ searchParams }: PageProps) {
 
     // Lock the page once any user exists — the system has moved past
     // first-run and the regular UI should be used.
-    const [watchmanCount, volunteerCount] = await Promise.all([
-        prisma.watchman.count(),
-        prisma.volunteer.count(),
-    ]);
-    const alreadyInitialized = watchmanCount + volunteerCount > 0;
+    const volunteerCount = await prisma.volunteer.count();
+    const alreadyInitialized = volunteerCount > 0;
 
     return (
         <BootstrapClient

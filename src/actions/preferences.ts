@@ -7,9 +7,9 @@ import { getSession } from '@/lib/session';
 type Language = 'EN' | 'ES';
 
 /**
- * Persist the current user's preferred language on their Watchman or
- * Volunteer record. Used by the one-time prompt shown after first login
- * and (later) by any profile screen that lets the user change it.
+ * Persist the current user's preferred language on their Volunteer
+ * record. Used by the one-time prompt shown after first login and
+ * (later) by any profile screen that lets the user change it.
  *
  * Returns `{ error }` on failure, `{ ok: true }` on success.
  */
@@ -23,18 +23,7 @@ export async function setMyLanguage(
     const session = await getSession();
     if (!session) return { error: 'Not signed in.' };
 
-    const table = session.identityType === 'WATCHMAN' ? 'watchman' : 'volunteer';
-    await (
-        prisma as unknown as Record<
-            string,
-            {
-                update: (args: {
-                    where: { id: string };
-                    data: { language: Language };
-                }) => Promise<unknown>;
-            }
-        >
-    )[table].update({
+    await prisma.volunteer.update({
         where: { id: session.identityId },
         data: { language: lang },
     });
@@ -53,21 +42,10 @@ export async function getMyLanguage(): Promise<Language | null> {
     const session = await getSession();
     if (!session) return null;
 
-    const table = session.identityType === 'WATCHMAN' ? 'watchman' : 'volunteer';
-    const row = await (
-        prisma as unknown as Record<
-            string,
-            {
-                findUnique: (args: {
-                    where: { id: string };
-                    select: { language: true };
-                }) => Promise<{ language: Language | null } | null>;
-            }
-        >
-    )[table].findUnique({
+    const row = await prisma.volunteer.findUnique({
         where: { id: session.identityId },
         select: { language: true },
     });
 
-    return row?.language ?? null;
+    return (row?.language as Language | null | undefined) ?? null;
 }

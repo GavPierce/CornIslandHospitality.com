@@ -6,57 +6,18 @@ import { ShiftSlot } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 
 // ─── Watchmen (People) ──────────────────────────────────
+//
+// Watchmen are just Volunteers with `isWatchman = true`. People CRUD
+// lives on the Volunteers page (`/volunteers`); this helper exists so
+// the schedule UI can fetch just the watchman-flagged subset with a
+// familiar name.
 
 export async function getWatchmen() {
-    return prisma.watchman.findMany({
+    return prisma.volunteer.findMany({
+        where: { isWatchman: true },
         orderBy: { name: 'asc' },
+        select: { id: true, name: true, email: true, phone: true },
     });
-}
-
-export async function createWatchman(formData: FormData) {
-    const authError = await requireAdmin();
-    if (authError) return { error: authError };
-
-    const name = (formData.get('name') as string)?.trim();
-    const email = ((formData.get('email') as string) || '').trim() || null;
-    const phone = ((formData.get('phone') as string) || '').trim() || null;
-
-    if (!name) return { error: 'Name is required.' };
-
-    await prisma.watchman.create({ data: { name, email, phone } });
-
-    revalidatePath('/watchman');
-    return { success: true };
-}
-
-export async function updateWatchman(formData: FormData) {
-    const authError = await requireAdmin();
-    if (authError) return { error: authError };
-
-    const id = (formData.get('id') as string)?.trim();
-    const name = (formData.get('name') as string)?.trim();
-    const email = ((formData.get('email') as string) || '').trim() || null;
-    const phone = ((formData.get('phone') as string) || '').trim() || null;
-
-    if (!id) return { error: 'Watchman id is required.' };
-    if (!name) return { error: 'Name is required.' };
-
-    await prisma.watchman.update({
-        where: { id },
-        data: { name, email, phone },
-    });
-
-    revalidatePath('/watchman');
-    return { success: true };
-}
-
-export async function deleteWatchman(id: string) {
-    const authError = await requireAdmin();
-    if (authError) return { error: authError };
-
-    await prisma.watchman.delete({ where: { id } });
-    revalidatePath('/watchman');
-    return { success: true };
 }
 
 // ─── Watchman Shifts (Schedule) ─────────────────────────
@@ -80,23 +41,39 @@ function parseDateOnly(value: string): Date | null {
 export async function getWatchmanShifts(year: number, month: number) {
     const start = new Date(Date.UTC(year, month, 1));
     const end = new Date(Date.UTC(year, month + 1, 1));
-    return prisma.watchmanShift.findMany({
+    const rows = await prisma.watchmanShift.findMany({
         where: { date: { gte: start, lt: end } },
-        include: { watchman: true },
+        include: { volunteer: { select: { id: true, name: true } } },
         orderBy: { date: 'asc' },
     });
+    // Expose the volunteer as `watchman` on the client so existing UI
+    // code that reads `.watchman.name` keeps working without churn.
+    return rows.map((r) => ({
+        id: r.id,
+        volunteerId: r.volunteerId,
+        watchmanId: r.volunteerId, // legacy alias for client code
+        date: r.date,
+        slot: r.slot,
+        notes: r.notes,
+        watchman: r.volunteer,
+    }));
 }
 
 export async function createWatchmanShift(formData: FormData) {
     const authError = await requireAdmin();
     if (authError) return { error: authError };
 
-    const watchmanId = formData.get('watchmanId') as string;
+    // The form still posts the field as `watchmanId` (the user-facing
+    // label is “watchman”), but internally it is a Volunteer id.
+    const volunteerId =
+        (formData.get('volunteerId') as string | null) ??
+        (formData.get('watchmanId') as string | null) ??
+        '';
     const dateStr = formData.get('date') as string;
     const slotStr = formData.get('slot') as string;
     const notes = ((formData.get('notes') as string) || '').trim() || null;
 
-    if (!watchmanId || !dateStr || !slotStr) {
+    if (!volunteerId || !dateStr || !slotStr) {
         return { error: 'Watchman, date, and shift are required.' };
     }
 
@@ -112,18 +89,21 @@ export async function createWatchmanShift(formData: FormData) {
     }
     const slot = slotStr as ShiftSlot;
 
-    const watchman = await prisma.watchman.findUnique({ where: { id: watchmanId } });
-    if (!watchman) return { error: 'Watchman not found.' };
+    const volunteer = await prisma.volunteer.findUnique({ where: { id: volunteerId } });
+    if (!volunteer) return { error: 'Watchman not found.' };
+    if (!volunteer.isWatchman) {
+        return { error: 'This person is not flagged as a watchman.' };
+    }
 
     // Prevent the same watchman from being double-assigned to the same shift
     const existing = await prisma.watchmanShift.findUnique({
-        where: { watchmanId_date_slot: { watchmanId, date, slot } },
+        where: { volunteerId_date_slot: { volunteerId, date, slot } },
     });
     if (existing) {
         return { error: 'This watchman is already assigned to that shift.' };
     }
 
-    await prisma.watchmanShift.create({ data: { watchmanId, date, slot, notes } });
+    await prisma.watchmanShift.create({ data: { volunteerId, date, slot, notes } });
 
     revalidatePath('/watchman');
     return { success: true };

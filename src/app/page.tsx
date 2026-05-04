@@ -39,7 +39,7 @@ export default async function DashboardPage() {
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
     const rows = await prisma.watchmanShift.findMany({
-      where: { watchmanId: session.identityId, date: { gte: today } },
+      where: { volunteerId: session.identityId, date: { gte: today } },
       orderBy: { date: 'asc' },
       take: 10,
     });

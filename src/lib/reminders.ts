@@ -311,7 +311,7 @@ export async function runDailyReminders(now: Date = new Date()): Promise<Reminde
     const [shifts, arrivals, departures] = await Promise.all([
         prisma.watchmanShift.findMany({
             where: { date: today },
-            include: { watchman: true },
+            include: { volunteer: true },
             orderBy: { createdAt: 'asc' },
         }),
         prisma.assignment.findMany({
@@ -335,23 +335,23 @@ export async function runDailyReminders(now: Date = new Date()): Promise<Reminde
         id: string;
         date: Date;
         slot: ShiftSlot;
-        watchman: { name: string; phone: string | null; language: Language | null };
+        volunteer: { name: string; phone: string | null; language: Language | null };
     }>) {
-        if (!s.watchman.phone) continue;
-        const lang = s.watchman.language ?? DEFAULT_LANG;
+        if (!s.volunteer.phone) continue;
+        const lang = s.volunteer.language ?? DEFAULT_LANG;
         const text = msgWatchmanShift({
-            name: s.watchman.name,
+            name: s.volunteer.name,
             date: today,
             slot: s.slot,
             lang,
         });
         const r = await sendReminder({
             kind: 'WATCHMAN_SHIFT',
-            phone: s.watchman.phone,
+            phone: s.volunteer.phone,
             referenceId: s.id,
             text,
         });
-        trackResult(summary, 'WATCHMAN_SHIFT', s.watchman.phone, r);
+        trackResult(summary, 'WATCHMAN_SHIFT', s.volunteer.phone, r);
     }
 
     // ── Volunteer arrival ────────────────────────────────────
@@ -421,8 +421,8 @@ export async function runDailyReminders(now: Date = new Date()): Promise<Reminde
         departures: departureDigest,
         shifts: (shifts as unknown as Array<{
             slot: ShiftSlot;
-            watchman: { name: string };
-        }>).map((s) => ({ name: s.watchman.name, slot: s.slot })),
+            volunteer: { name: string };
+        }>).map((s) => ({ name: s.volunteer.name, slot: s.slot })),
     };
     const adminPhones = [...adminPhoneSet()];
     for (const adminPhone of adminPhones) {
@@ -460,37 +460,13 @@ function trackResult(
 async function lookupLanguage(phoneE164: string): Promise<Language> {
     const phone = normalizePhone(phoneE164);
     if (!phone) return DEFAULT_LANG;
-    const watchmen = await (
-        prisma as unknown as {
-            watchman: {
-                findMany: (args: {
-                    where: { phone: { not: null } };
-                    select: { phone: true; language: true };
-                }) => Promise<Array<{ phone: string | null; language: Language | null }>>;
-            };
-        }
-    ).watchman.findMany({
-        where: { phone: { not: null } },
-        select: { phone: true, language: true },
-    });
-    for (const w of watchmen) {
-        if (normalizePhone(w.phone) === phone && w.language) return w.language;
-    }
-    const vols = await (
-        prisma as unknown as {
-            volunteer: {
-                findMany: (args: {
-                    where: { phone: { not: null } };
-                    select: { phone: true; language: true };
-                }) => Promise<Array<{ phone: string | null; language: Language | null }>>;
-            };
-        }
-    ).volunteer.findMany({
+    const vols = await prisma.volunteer.findMany({
         where: { phone: { not: null } },
         select: { phone: true, language: true },
     });
     for (const v of vols) {
-        if (normalizePhone(v.phone) === phone && v.language) return v.language;
+        if (normalizePhone(v.phone) === phone && v.language)
+            return v.language as Language;
     }
     return DEFAULT_LANG;
 }

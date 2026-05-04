@@ -57,22 +57,14 @@ type Identity = {
 };
 
 /**
- * Look up a person by phone across the Watchman and Volunteer tables.
- * Both sides are normalized so that stored phones like "+505 8888-6666"
- * or "(505) 8888-6666" still match. Watchmen win ties since they're the
- * primary audience for the schedule view.
+ * Look up a person by phone in the Volunteer table. Stored phones are
+ * normalized before comparison so values like "+505 8888-6666" or
+ * "(505) 8888-6666" still match.
+ *
+ * Watchmen are represented as Volunteers with `isWatchman = true`, so
+ * there is only one table to search here.
  */
 async function findIdentityByPhone(phoneE164: string): Promise<Identity | null> {
-    const watchmen = await prisma.watchman.findMany({
-        where: { phone: { not: null } },
-        select: { id: true, name: true, phone: true },
-    });
-    for (const w of watchmen) {
-        if (normalizePhone(w.phone) === phoneE164) {
-            return { type: 'WATCHMAN', id: w.id, name: w.name };
-        }
-    }
-
     const volunteers = await prisma.volunteer.findMany({
         where: { phone: { not: null } },
         select: { id: true, name: true, phone: true },

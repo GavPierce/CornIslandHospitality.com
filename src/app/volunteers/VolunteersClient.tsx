@@ -11,6 +11,7 @@ type VolunteerWithAssignments = {
     email: string | null;
     phone: string | null;
     type: string;
+    isWatchman: boolean;
     assignments: {
         id: string;
         startDate: Date;
@@ -115,6 +116,19 @@ export default function VolunteersClient({
                                     <input id="vol-phone" name="phone" type="tel" placeholder={t.volunteers.phonePlaceholder} />
                                 </div>
                             </div>
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label htmlFor="vol-watchman" style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                                        <input
+                                            id="vol-watchman"
+                                            name="isWatchman"
+                                            type="checkbox"
+                                            style={{ width: 18, height: 18, cursor: 'pointer' }}
+                                        />
+                                        <span>Is watchman</span>
+                                    </label>
+                                </div>
+                            </div>
                             <button type="submit" className="btn btn-primary">{t.volunteers.addVolunteerBtn}</button>
                         </form>
                     </div>
@@ -186,6 +200,20 @@ export default function VolunteersClient({
                                                             type="email"
                                                             className="form-input"
                                                         />
+                                                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                                                            <input
+                                                                type="hidden"
+                                                                name="isWatchmanPresent"
+                                                                value="1"
+                                                            />
+                                                            <input
+                                                                type="checkbox"
+                                                                name="isWatchman"
+                                                                defaultChecked={v.isWatchman}
+                                                                style={{ width: 18, height: 18, cursor: 'pointer' }}
+                                                            />
+                                                            <span>Is watchman</span>
+                                                        </label>
                                                         <button type="submit" className="btn btn-primary btn-sm">
                                                             Save
                                                         </button>
@@ -203,7 +231,22 @@ export default function VolunteersClient({
                                     }
                                     return (
                                         <tr key={v.id}>
-                                            <td style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{v.name}</td>
+                                            <td style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
+                                                {v.name}
+                                                {v.isWatchman && (
+                                                    <span style={{
+                                                        marginLeft: 8,
+                                                        padding: '2px 8px',
+                                                        fontSize: '0.75rem',
+                                                        background: 'rgba(59, 130, 246, 0.15)',
+                                                        color: '#60a5fa',
+                                                        borderRadius: 999,
+                                                        fontWeight: 500,
+                                                    }}>
+                                                        Watchman
+                                                    </span>
+                                                )}
+                                            </td>
                                             <td>
                                                 <span className={typeBadgeClass(v.type)}>{typeLabel(v.type)}</span>
                                             </td>
