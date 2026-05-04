@@ -325,10 +325,22 @@ async function sendReminder(params: {
     }
 
     await ensureWhatsAppStarted();
+
+    // ensureWhatsAppStarted() resolves once the socket is *created*, but
+    // the actual connection ('open' event) fires asynchronously after.
+    // Wait up to 15 seconds for the state to leave 'connecting'.
+    const MAX_WAIT_MS = 15_000;
+    const POLL_MS = 500;
+    let waited = 0;
+    while (getWhatsAppStatus().state === 'connecting' && waited < MAX_WAIT_MS) {
+        await new Promise((r) => setTimeout(r, POLL_MS));
+        waited += POLL_MS;
+    }
+
     const status = getWhatsAppStatus();
     if (status.state !== 'connected') {
         console.warn(
-            `[reminders] Skipping send, WA not connected (state=${status.state}). ` +
+            `[reminders] Skipping send, WA not connected (state=${status.state}, waited=${waited}ms). ` +
                 `kind=${params.kind} to=${phone}`,
         );
         return { sent: false, skipped: 'not-connected' };
