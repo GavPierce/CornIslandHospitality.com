@@ -50,18 +50,20 @@ model Room {
 }
 
 model Volunteer {
-  id            String        @id @default(cuid())
-  name          String
-  email         String?
-  phone         String?
-  type          VolunteerType
-  language      Language?     // preferred language for WhatsApp reminders
-  isWatchman    Boolean       @default(false) // also stands night-watch shifts
-  assignments   Assignment[]
-  shifts        WatchmanShift[]
-  ownedHouses   HouseOwner[]  // join rows where this volunteer is a house owner
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id                     String        @id @default(cuid())
+  name                   String
+  email                  String?
+  phone                  String?
+  type                   VolunteerType
+  language               Language?     // preferred language for WhatsApp reminders
+  isWatchman             Boolean       @default(false) // also stands night-watch shifts
+  isHospitality          Boolean       @default(false) // member of the hospitality welcome team
+  assignments            Assignment[]  @relation("AssignmentVolunteer")
+  hospitalityAssignments Assignment[]  @relation("HospitalityMember") // assignments where this volunteer is the hospitality contact
+  shifts                 WatchmanShift[]
+  ownedHouses            HouseOwner[]  // join rows where this volunteer is a house owner
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
 }
 
 // Many-to-many: a house can have multiple owners, a volunteer can own multiple houses
@@ -77,18 +79,21 @@ model HouseOwner {
 }
 
 model Assignment {
-  id            String      @id @default(cuid())
-  volunteerId   String
-  volunteer     Volunteer   @relation(fields: [volunteerId], references: [id], onDelete: Cascade)
-  roomId        String
-  room          Room        @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  startDate     DateTime
-  endDate       DateTime
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  id                    String     @id @default(cuid())
+  volunteerId           String
+  volunteer             Volunteer  @relation("AssignmentVolunteer", fields: [volunteerId], references: [id], onDelete: Cascade)
+  roomId                String
+  room                  Room       @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  startDate             DateTime
+  endDate               DateTime
+  hospitalityMemberId   String?    // optional hospitality team member assigned to welcome this volunteer
+  hospitalityMember     Volunteer? @relation("HospitalityMember", fields: [hospitalityMemberId], references: [id], onDelete: SetNull)
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
 
   @@index([roomId])
   @@index([volunteerId])
+  @@index([hospitalityMemberId])
 }
 
 model WatchmanShift {
@@ -150,6 +155,9 @@ enum ReminderKind {
   VOLUNTEER_DEPARTURE      // day-of checkout reminder to the volunteer
   ADMIN_DAILY_DIGEST       // daily summary to each admin phone
   ASSIGNMENT_CONFIRMATION  // instant confirmation when a room is assigned
+  HOSPITALITY_PAIRING      // instant notification to hospitality member when paired
+  HOSPITALITY_CANCELLATION // notification to hospitality member when they are replaced
+  HOSPITALITY_ARRIVAL      // day-of reminder to hospitality member when their volunteer arrives
 }
 
 /**

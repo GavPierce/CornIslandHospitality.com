@@ -75,7 +75,10 @@ export default async function DashboardPage() {
   } else if (session?.identityType === 'VOLUNTEER') {
     const rows = await prisma.assignment.findMany({
       where: { volunteerId: session.identityId, endDate: { gte: new Date() } },
-      include: { room: { include: { house: true } } },
+      include: {
+        room: { include: { house: true } },
+        hospitalityMember: { select: { name: true, phone: true } },
+      },
       orderBy: { startDate: 'asc' },
     });
     myAssignments = rows.map((a) => ({
@@ -85,6 +88,9 @@ export default async function DashboardPage() {
       roomName: a.room.name,
       houseName: a.room.house.name,
       houseAddress: a.room.house.address,
+      hospitalityContact: a.hospitalityMember
+        ? { name: a.hospitalityMember.name, phone: a.hospitalityMember.phone }
+        : null,
     }));
   }
 

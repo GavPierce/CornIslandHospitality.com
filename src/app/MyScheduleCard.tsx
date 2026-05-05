@@ -19,6 +19,7 @@ export type MyAssignment = {
     roomName: string;
     houseName: string;
     houseAddress: string;
+    hospitalityContact: { name: string; phone: string | null } | null;
 };
 
 export default function MyScheduleCard({
@@ -147,6 +148,31 @@ export default function MyScheduleCard({
                                     <div style={{ fontSize: '0.85rem', color: 'var(--accent-secondary)', marginTop: 4 }}>
                                         {formatDate(a.startDate)} — {formatDate(a.endDate)}
                                     </div>
+                                    {a.hospitalityContact && (
+                                        <div style={{
+                                            marginTop: 8,
+                                            padding: '6px 10px',
+                                            background: 'rgba(16,185,129,0.08)',
+                                            border: '1px solid rgba(16,185,129,0.2)',
+                                            borderRadius: 6,
+                                            fontSize: '0.8rem',
+                                            color: '#34d399',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 6,
+                                            flexWrap: 'wrap',
+                                        }}>
+                                            <span>🤝 <strong>Your hospitality contact:</strong> {a.hospitalityContact.name}</span>
+                                            {a.hospitalityContact.phone && (
+                                                <a
+                                                    href={`tel:${a.hospitalityContact.phone}`}
+                                                    style={{ color: '#34d399', fontWeight: 600, textDecoration: 'none' }}
+                                                >
+                                                    📞 {a.hospitalityContact.phone}
+                                                </a>
+                                            )}
+                                        </div>
+                                    )}
                                 </li>
                             ))}
                         </ul>

@@ -12,6 +12,7 @@ type VolunteerWithAssignments = {
     phone: string | null;
     type: string;
     language: string | null;
+    isHospitality: boolean;
     isWatchman: boolean;
     assignments: {
         id: string;
@@ -120,13 +121,14 @@ export default function VolunteersClient({
                             <div className="form-row">
                                 <div className="form-group">
                                     <label htmlFor="vol-watchman" style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                                        <input
-                                            id="vol-watchman"
-                                            name="isWatchman"
-                                            type="checkbox"
-                                            style={{ width: 18, height: 18, cursor: 'pointer' }}
-                                        />
+                                        <input id="vol-watchman" name="isWatchman" type="checkbox" style={{ width: 18, height: 18, cursor: 'pointer' }} />
                                         <span>Is watchman</span>
+                                    </label>
+                                </div>
+                                <div className="form-group">
+                                    <label htmlFor="vol-hospitality" style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                                        <input id="vol-hospitality" name="isHospitality" type="checkbox" style={{ width: 18, height: 18, cursor: 'pointer' }} />
+                                        <span>🤝 Is hospitality team</span>
                                     </label>
                                 </div>
                             </div>
@@ -214,18 +216,14 @@ export default function VolunteersClient({
                                                             <option value="ES">🇳🇮 Español</option>
                                                         </select>
                                                         <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                                                            <input
-                                                                type="hidden"
-                                                                name="isWatchmanPresent"
-                                                                value="1"
-                                                            />
-                                                            <input
-                                                                type="checkbox"
-                                                                name="isWatchman"
-                                                                defaultChecked={v.isWatchman}
-                                                                style={{ width: 18, height: 18, cursor: 'pointer' }}
-                                                            />
-                                                            <span>Is watchman</span>
+                                                            <input type="hidden" name="isWatchmanPresent" value="1" />
+                                                            <input type="checkbox" name="isWatchman" defaultChecked={v.isWatchman} style={{ width: 18, height: 18, cursor: 'pointer' }} />
+                                                            <span>Watchman</span>
+                                                        </label>
+                                                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                                                            <input type="hidden" name="isHospitalityPresent" value="1" />
+                                                            <input type="checkbox" name="isHospitality" defaultChecked={v.isHospitality} style={{ width: 18, height: 18, cursor: 'pointer' }} />
+                                                            <span>🤝 Hospitality</span>
                                                         </label>
                                                         <button type="submit" className="btn btn-primary btn-sm">
                                                             Save
@@ -247,16 +245,13 @@ export default function VolunteersClient({
                                             <td style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
                                                 {v.name}
                                                 {v.isWatchman && (
-                                                    <span style={{
-                                                        marginLeft: 8,
-                                                        padding: '2px 8px',
-                                                        fontSize: '0.75rem',
-                                                        background: 'rgba(59, 130, 246, 0.15)',
-                                                        color: '#60a5fa',
-                                                        borderRadius: 999,
-                                                        fontWeight: 500,
-                                                    }}>
+                                                    <span style={{ marginLeft: 8, padding: '2px 8px', fontSize: '0.75rem', background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', borderRadius: 999, fontWeight: 500 }}>
                                                         Watchman
+                                                    </span>
+                                                )}
+                                                {v.isHospitality && (
+                                                    <span style={{ marginLeft: 8, padding: '2px 8px', fontSize: '0.75rem', background: 'rgba(16,185,129,0.15)', color: '#34d399', borderRadius: 999, fontWeight: 500 }}>
+                                                        🤝 Hospitality
                                                     </span>
                                                 )}
                                             </td>

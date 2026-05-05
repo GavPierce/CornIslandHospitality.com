@@ -162,17 +162,24 @@ async function msgAssignmentConfirmation(params: {
     startDate: Date;
     endDate: Date;
     lang: Language;
+    hospitalityContact?: { name: string; phone: string | null } | null;
 }): Promise<string> {
-    const { volunteerName, houseName, houseAddress, roomName, startDate, endDate, lang } = params;
+    const { volunteerName, houseName, houseAddress, roomName, startDate, endDate, lang, hospitalityContact } = params;
     const from = formatLongDate(startDate, lang);
     const to = formatLongDate(endDate, lang);
     
     let template = await getMessageTemplate(`template.ASSIGNMENT_CONFIRMATION.${lang}`);
     if (!template) {
         template = lang === 'ES'
-            ? `🏠 *Alojamiento confirmado — ¡Hola {volunteerName}!*\n\nSe te ha asignado una habitación en *{houseName}* ({houseAddress}).\nHabitación: *{roomName}*.\nFechas: {startDate} → {endDate}.\n\nSi tienes alguna pregunta, comunícate con tu coordinador.\n— Corn Island Hospitality`
-            : `🏠 *Housing confirmed — Hi {volunteerName}!*\n\nYou've been assigned a room at *{houseName}* ({houseAddress}).\nRoom: *{roomName}*.\nDates: {startDate} → {endDate}.\n\nIf you have any questions, reach out to your coordinator.\n— Corn Island Hospitality`;
+            ? `🏠 *Alojamiento confirmado — ¡Hola {volunteerName}!*\n\nSe te ha asignado una habitación en *{houseName}* ({houseAddress}).\nHabitación: *{roomName}*.\nFechas: {startDate} → {endDate}.{hospitalityBlock}\n\nSi tienes alguna pregunta, comunícate con tu coordinador.\n— Corn Island Hospitality`
+            : `🏠 *Housing confirmed — Hi {volunteerName}!*\n\nYou've been assigned a room at *{houseName}* ({houseAddress}).\nRoom: *{roomName}*.\nDates: {startDate} → {endDate}.{hospitalityBlock}\n\nIf you have any questions, reach out to your coordinator.\n— Corn Island Hospitality`;
     }
+
+    const hospitalityBlock = hospitalityContact
+        ? lang === 'ES'
+            ? `\n\n🤝 *Tu contacto de hospitalidad:* ${hospitalityContact.name}${hospitalityContact.phone ? ` · 📞 ${hospitalityContact.phone}` : ''}`
+            : `\n\n🤝 *Your hospitality contact:* ${hospitalityContact.name}${hospitalityContact.phone ? ` · 📞 ${hospitalityContact.phone}` : ''}`
+        : '';
 
     return template
         .replace(/{volunteerName}/g, volunteerName)
@@ -180,7 +187,8 @@ async function msgAssignmentConfirmation(params: {
         .replace(/{houseAddress}/g, houseAddress)
         .replace(/{roomName}/g, roomName)
         .replace(/{startDate}/g, from)
-        .replace(/{endDate}/g, to);
+        .replace(/{endDate}/g, to)
+        .replace(/{hospitalityBlock}/g, hospitalityBlock);
 }
 
 async function msgOwnerNotification(params: {
@@ -210,6 +218,70 @@ async function msgOwnerNotification(params: {
         .replace(/{roomName}/g, roomName)
         .replace(/{startDate}/g, from)
         .replace(/{endDate}/g, to);
+}
+
+// ── Hospitality message templates ────────────────────────────
+
+async function msgHospitalityPairing(params: {
+    hospitalityName: string;
+    volunteerName: string;
+    houseName: string;
+    houseAddress: string;
+    roomName: string;
+    startDate: Date;
+    endDate: Date;
+    lang: Language;
+}): Promise<string> {
+    const { hospitalityName, volunteerName, houseName, houseAddress, roomName, startDate, endDate, lang } = params;
+    const from = formatLongDate(startDate, lang);
+    const to = formatLongDate(endDate, lang);
+    const template = lang === 'ES'
+        ? `🤝 *¡Hola {hospitalityName}!* Has sido asignado/a para dar la bienvenida a *{volunteerName}*, quien se alojará en *{houseName}* ({houseAddress}), habitación *{roomName}*, del {startDate} al {endDate}.\n\nPor favor, comunícate con él/ella para darle la bienvenida.\n— Corn Island Hospitality`
+        : `🤝 *Hi {hospitalityName}!* You've been assigned to welcome *{volunteerName}*, who will be staying at *{houseName}* ({houseAddress}), Room *{roomName}*, from {startDate} to {endDate}.\n\nPlease reach out to greet them on arrival!\n— Corn Island Hospitality`;
+    return template
+        .replace(/{hospitalityName}/g, hospitalityName)
+        .replace(/{volunteerName}/g, volunteerName)
+        .replace(/{houseName}/g, houseName)
+        .replace(/{houseAddress}/g, houseAddress)
+        .replace(/{roomName}/g, roomName)
+        .replace(/{startDate}/g, from)
+        .replace(/{endDate}/g, to);
+}
+
+async function msgHospitalityCancellation(params: {
+    hospitalityName: string;
+    volunteerName: string;
+    houseName: string;
+    lang: Language;
+}): Promise<string> {
+    const { hospitalityName, volunteerName, houseName, lang } = params;
+    const template = lang === 'ES'
+        ? `🔔 *Hola {hospitalityName}* — Tu asignación para dar la bienvenida a *{volunteerName}* en *{houseName}* ha sido cancelada. No se requiere ninguna acción adicional.\n— Corn Island Hospitality`
+        : `🔔 *Hi {hospitalityName}* — Your hospitality assignment for *{volunteerName}* at *{houseName}* has been cancelled. No further action is needed.\n— Corn Island Hospitality`;
+    return template
+        .replace(/{hospitalityName}/g, hospitalityName)
+        .replace(/{volunteerName}/g, volunteerName)
+        .replace(/{houseName}/g, houseName);
+}
+
+async function msgHospitalityArrival(params: {
+    hospitalityName: string;
+    volunteerName: string;
+    houseName: string;
+    houseAddress: string;
+    roomName: string;
+    lang: Language;
+}): Promise<string> {
+    const { hospitalityName, volunteerName, houseName, houseAddress, roomName, lang } = params;
+    const template = lang === 'ES'
+        ? `🤝 *Recordatorio — ¡Hola {hospitalityName}!* *{volunteerName}* llega hoy a *{houseName}* ({houseAddress}), habitación *{roomName}*. ¡Hoy es el día de darle la bienvenida!\n— Corn Island Hospitality`
+        : `🤝 *Reminder — Hi {hospitalityName}!* *{volunteerName}* arrives today at *{houseName}* ({houseAddress}), Room *{roomName}*. Today's the day to welcome them!\n— Corn Island Hospitality`;
+    return template
+        .replace(/{hospitalityName}/g, hospitalityName)
+        .replace(/{volunteerName}/g, volunteerName)
+        .replace(/{houseName}/g, houseName)
+        .replace(/{houseAddress}/g, houseAddress)
+        .replace(/{roomName}/g, roomName);
 }
 
 type DigestEntry = {
@@ -366,6 +438,7 @@ export async function sendAssignmentConfirmation(assignmentId: string): Promise<
         where: { id: assignmentId },
         include: {
             volunteer: { select: { name: true, phone: true, language: true } },
+            hospitalityMember: { select: { id: true, name: true, phone: true, language: true } },
             room: {
                 include: {
                     house: {
@@ -396,10 +469,13 @@ export async function sendAssignmentConfirmation(assignmentId: string): Promise<
             };
         };
     };
+    const hospitalityMember = assignment.hospitalityMember as unknown as {
+        id: string; name: string; phone: string | null; language: Language | null;
+    } | null;
 
     const house = room.house;
 
-    // ── Volunteer confirmation ───────────────────────────────
+    // ── Volunteer confirmation (includes hospitality contact if set) ──
     if (volunteer.phone) {
         const lang = volunteer.language ?? DEFAULT_LANG;
         const text = await msgAssignmentConfirmation({
@@ -410,6 +486,7 @@ export async function sendAssignmentConfirmation(assignmentId: string): Promise<
             startDate: assignment.startDate,
             endDate: assignment.endDate,
             lang,
+            hospitalityContact: hospitalityMember,
         });
         await sendReminder({
             kind: 'ASSIGNMENT_CONFIRMATION',
@@ -436,11 +513,94 @@ export async function sendAssignmentConfirmation(assignmentId: string): Promise<
         await sendReminder({
             kind: 'ASSIGNMENT_CONFIRMATION',
             phone: owner.phone,
-            // Distinct referenceId per owner so each co-owner gets their own log row
             referenceId: `owner-${owner.id}-${assignmentId}`,
             text,
         });
     }
+
+    // ── Hospitality member pairing notification ────────────
+    if (hospitalityMember?.phone) {
+        const lang = hospitalityMember.language ?? DEFAULT_LANG;
+        const text = await msgHospitalityPairing({
+            hospitalityName: hospitalityMember.name,
+            volunteerName: volunteer.name,
+            houseName: house.name,
+            houseAddress: house.address,
+            roomName: room.name,
+            startDate: assignment.startDate,
+            endDate: assignment.endDate,
+            lang,
+        });
+        // Use a timestamp-based referenceId: pairings are event-driven, not once-per-day idempotent
+        await sendReminder({
+            kind: 'HOSPITALITY_PAIRING',
+            phone: hospitalityMember.phone,
+            referenceId: `pairing-${assignmentId}-${hospitalityMember.id}-${Date.now()}`,
+            text,
+        });
+    }
+}
+
+/**
+ * Send a HOSPITALITY_PAIRING notification to the currently-assigned
+ * hospitality member for an assignment. Used when the member is changed
+ * after creation.
+ */
+export async function sendHospitalityPairingNotification(assignmentId: string): Promise<void> {
+    const assignment = await prisma.assignment.findUnique({
+        where: { id: assignmentId },
+        include: {
+            volunteer: { select: { name: true } },
+            hospitalityMember: { select: { id: true, name: true, phone: true, language: true } },
+            room: { include: { house: { select: { name: true, address: true } } } },
+        },
+    });
+    if (!assignment?.hospitalityMember?.phone) return;
+
+    const hm = assignment.hospitalityMember as unknown as { id: string; name: string; phone: string; language: Language | null };
+    const lang = hm.language ?? DEFAULT_LANG;
+    const text = await msgHospitalityPairing({
+        hospitalityName: hm.name,
+        volunteerName: (assignment.volunteer as unknown as { name: string }).name,
+        houseName: (assignment.room as unknown as { house: { name: string; address: string } }).house.name,
+        houseAddress: (assignment.room as unknown as { house: { name: string; address: string } }).house.address,
+        roomName: (assignment.room as unknown as { name: string }).name,
+        startDate: assignment.startDate,
+        endDate: assignment.endDate,
+        lang,
+    });
+    await sendReminder({
+        kind: 'HOSPITALITY_PAIRING',
+        phone: hm.phone,
+        referenceId: `pairing-${assignmentId}-${hm.id}-${Date.now()}`,
+        text,
+    });
+}
+
+/**
+ * Send a HOSPITALITY_CANCELLATION notification to the previously-assigned
+ * hospitality member when they are replaced on an assignment.
+ */
+export async function sendHospitalityCancellationNotification(params: {
+    assignmentId: string;
+    hospitalityMember: { id: string; name: string; phone: string; language: string | null };
+    volunteerName: string;
+    houseName: string;
+}): Promise<void> {
+    const { assignmentId, hospitalityMember: hm, volunteerName, houseName } = params;
+    const lang = (hm.language as Language | null) ?? DEFAULT_LANG;
+    const text = await msgHospitalityCancellation({
+        hospitalityName: hm.name,
+        volunteerName,
+        houseName,
+        lang,
+    });
+    await sendReminder({
+        kind: 'HOSPITALITY_CANCELLATION',
+        phone: hm.phone,
+        referenceId: `cancel-${assignmentId}-${hm.id}-${Date.now()}`,
+        text,
+    });
 }
 
 export type ReminderRunSummary = {
@@ -484,6 +644,7 @@ export async function runDailyReminders(now: Date = new Date()): Promise<Reminde
             where: { startDate: today },
             include: {
                 volunteer: true,
+                hospitalityMember: { select: { id: true, name: true, phone: true, language: true } },
                 room: { include: { house: true } },
             },
         }),
@@ -526,6 +687,7 @@ export async function runDailyReminders(now: Date = new Date()): Promise<Reminde
         id: string;
         endDate: Date;
         volunteer: { name: string; phone: string | null; language: Language | null };
+        hospitalityMember: { id: string; name: string; phone: string | null; language: Language | null } | null;
         room: { name: string; house: { name: string; address: string } };
     }>) {
         arrivalDigest.push({
@@ -533,23 +695,44 @@ export async function runDailyReminders(now: Date = new Date()): Promise<Reminde
             house: a.room.house.name,
             room: a.room.name,
         });
-        if (!a.volunteer.phone) continue;
-        const lang = a.volunteer.language ?? DEFAULT_LANG;
-        const text = await msgVolunteerArrival({
-            name: a.volunteer.name,
-            houseName: a.room.house.name,
-            houseAddress: a.room.house.address,
-            roomName: a.room.name,
-            endDate: a.endDate,
-            lang,
-        });
-        const r = await sendReminder({
-            kind: 'VOLUNTEER_ARRIVAL',
-            phone: a.volunteer.phone,
-            referenceId: a.id,
-            text,
-        });
-        trackResult(summary, 'VOLUNTEER_ARRIVAL', a.volunteer.phone, r);
+        if (a.volunteer.phone) {
+            const lang = a.volunteer.language ?? DEFAULT_LANG;
+            const text = await msgVolunteerArrival({
+                name: a.volunteer.name,
+                houseName: a.room.house.name,
+                houseAddress: a.room.house.address,
+                roomName: a.room.name,
+                endDate: a.endDate,
+                lang,
+            });
+            const r = await sendReminder({
+                kind: 'VOLUNTEER_ARRIVAL',
+                phone: a.volunteer.phone,
+                referenceId: a.id,
+                text,
+            });
+            trackResult(summary, 'VOLUNTEER_ARRIVAL', a.volunteer.phone, r);
+        }
+        // ── Hospitality member arrival reminder ────────────────
+        if (a.hospitalityMember?.phone) {
+            const hm = a.hospitalityMember;
+            const lang = hm.language ?? DEFAULT_LANG;
+            const text = await msgHospitalityArrival({
+                hospitalityName: hm.name,
+                volunteerName: a.volunteer.name,
+                houseName: a.room.house.name,
+                houseAddress: a.room.house.address,
+                roomName: a.room.name,
+                lang,
+            });
+            const r = await sendReminder({
+                kind: 'HOSPITALITY_ARRIVAL',
+                phone: hm.phone,
+                referenceId: `hospitality-arrival-${a.id}`,
+                text,
+            });
+            trackResult(summary, 'HOSPITALITY_ARRIVAL', hm.phone, r);
+        }
     }
 
     // ── Volunteer departure ──────────────────────────────────

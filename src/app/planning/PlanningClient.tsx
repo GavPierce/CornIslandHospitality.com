@@ -1,6 +1,6 @@
 'use client';
 
-import { createAssignment, deleteAssignment, createHouse, createRoom, deleteHouse, deleteRoom, addHouseOwner, removeHouseOwner } from '@/actions/housing';
+import { createAssignment, deleteAssignment, createHouse, createRoom, deleteHouse, deleteRoom, addHouseOwner, removeHouseOwner, updateAssignmentHospitality } from '@/actions/housing';
 import type { UserRole } from '@/lib/auth';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { useState } from 'react';
@@ -15,6 +15,7 @@ type Room = {
         startDate: Date;
         endDate: Date;
         volunteer: { id: string; name: string; type: string };
+        hospitalityMember: { id: string; name: string; phone: string | null } | null;
     }[];
 };
 
@@ -35,6 +36,7 @@ type Volunteer = {
     id: string;
     name: string;
     type: string;
+    isHospitality: boolean;
     assignments: {
         id: string;
         room: { name: string; house: { name: string } };
@@ -68,6 +70,11 @@ export default function PlanningClient({
     // Per-house add-owner picker: houseId → selected volunteerId in the dropdown
     const [addOwnerOpen, setAddOwnerOpen] = useState<string | null>(null);
     const [addOwnerValue, setAddOwnerValue] = useState<Record<string, string>>({});
+    // Per-assignment hospitality picker: assignmentId → open state
+    const [hospPickerOpen, setHospPickerOpen] = useState<string | null>(null);
+    const [hospPickerValue, setHospPickerValue] = useState<Record<string, string>>({});
+
+    const hospitalityMembers = volunteers.filter((v) => v.isHospitality);
 
     const unassignedVolunteers = volunteers.filter((v) => v.assignments.length === 0);
 
@@ -458,6 +465,17 @@ export default function PlanningClient({
                             <input id="assign-end" name="endDate" type="date" required />
                         </div>
                     </div>
+                    {hospitalityMembers.length > 0 && (
+                        <div className="form-group" style={{ marginBottom: 16 }}>
+                            <label htmlFor="assign-hospitality">🤝 Hospitality contact (optional)</label>
+                            <select id="assign-hospitality" name="hospitalityMemberId">
+                                <option value="">No hospitality contact</option>
+                                {hospitalityMembers.map((v) => (
+                                    <option key={v.id} value={v.id}>{v.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
                     <button type="submit" className="btn btn-primary">{t.planning.assignVolunteer}</button>
                 </form>
             </div>
@@ -525,18 +543,62 @@ export default function PlanningClient({
                                                             <span className={typeBadgeClass(a.volunteer.type)} style={{ marginLeft: 8 }}>
                                                                 {typeLabel(a.volunteer.type)}
                                                             </span>
+                                                            {/* Hospitality contact chip */}
+                                                            {a.hospitalityMember && (
+                                                                <span style={{
+                                                                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                                                                    marginLeft: 8, padding: '2px 7px',
+                                                                    background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)',
+                                                                    borderRadius: 999, fontSize: '0.73rem', fontWeight: 500, color: '#34d399',
+                                                                }}>
+                                                                    🤝 {a.hospitalityMember.name}
+                                                                    {a.hospitalityMember.phone && <span style={{ color: 'var(--text-tertiary)' }}>· {a.hospitalityMember.phone}</span>}
+                                                                </span>
+                                                            )}
                                                         </div>
                                                         {isAdmin && (
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                                <span style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem' }}>
-                                                                    {new Date(a.startDate).toLocaleDateString()} – {new Date(a.endDate).toLocaleDateString()}
-                                                                </span>
-                                                                <button
-                                                                    className="btn btn-danger btn-sm"
-                                                                    onClick={() => deleteAssignment(a.id)}
-                                                                >
-                                                                    ✕
-                                                                </button>
+                                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                                    <span style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem' }}>
+                                                                        {new Date(a.startDate).toLocaleDateString()} – {new Date(a.endDate).toLocaleDateString()}
+                                                                    </span>
+                                                                    <button
+                                                                        className="btn btn-sm"
+                                                                        style={{ fontSize: '0.72rem', border: '1px solid rgba(16,185,129,0.4)', color: '#34d399' }}
+                                                                        onClick={() => setHospPickerOpen(hospPickerOpen === a.id ? null : a.id)}
+                                                                    >
+                                                                        🤝 {a.hospitalityMember ? 'Change' : 'Assign'}
+                                                                    </button>
+                                                                    <button
+                                                                        className="btn btn-danger btn-sm"
+                                                                        onClick={() => deleteAssignment(a.id)}
+                                                                    >
+                                                                        ✕
+                                                                    </button>
+                                                                </div>
+                                                                {hospPickerOpen === a.id && (
+                                                                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginTop: 2 }}>
+                                                                        <select
+                                                                            style={{ padding: '4px 8px', fontSize: '0.8rem', minWidth: 140 }}
+                                                                            value={hospPickerValue[a.id] ?? a.hospitalityMember?.id ?? ''}
+                                                                            onChange={(e) => setHospPickerValue((prev) => ({ ...prev, [a.id]: e.target.value }))}
+                                                                        >
+                                                                            <option value="">No contact</option>
+                                                                            {hospitalityMembers.map((v) => (
+                                                                                <option key={v.id} value={v.id}>{v.name}</option>
+                                                                            ))}
+                                                                        </select>
+                                                                        <button
+                                                                            className="btn btn-primary btn-sm"
+                                                                            onClick={async () => {
+                                                                                const newId = hospPickerValue[a.id] ?? '';
+                                                                                await updateAssignmentHospitality(a.id, newId || null);
+                                                                                setHospPickerOpen(null);
+                                                                            }}
+                                                                        >Save</button>
+                                                                        <button className="btn btn-sm" style={{ border: '1px solid var(--border-color)' }} onClick={() => setHospPickerOpen(null)}>Cancel</button>
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         )}
                                                         {!isAdmin && (

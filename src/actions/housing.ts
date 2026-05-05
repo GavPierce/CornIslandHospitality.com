@@ -4,7 +4,7 @@ import { requireAdmin } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { VolunteerType, Language } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
-import { sendAssignmentConfirmation } from '@/lib/reminders';
+import { sendAssignmentConfirmation, sendHospitalityPairingNotification, sendHospitalityCancellationNotification } from '@/lib/reminders';
 
 // ─── Houses ──────────────────────────────────────────
 
@@ -20,7 +20,12 @@ export async function getHouses() {
             rooms: {
                 include: {
                     assignments: {
-                        include: { volunteer: true },
+                        include: {
+                            volunteer: true,
+                            hospitalityMember: {
+                                select: { id: true, name: true, phone: true },
+                            },
+                        },
                         where: {
                             endDate: { gte: new Date() },
                         },
@@ -45,7 +50,7 @@ export async function createHouse(formData: FormData) {
         return { error: 'All fields are required.' };
     }
 
-    const house = await prisma.house.create({
+    await prisma.house.create({
         data: {
             name,
             address,
@@ -56,7 +61,6 @@ export async function createHouse(formData: FormData) {
         },
     });
 
-    void house; // suppress unused var warning
     revalidatePath('/planning');
     return { success: true };
 }
@@ -70,10 +74,6 @@ export async function deleteHouse(id: string) {
     return { success: true };
 }
 
-/**
- * Add a single volunteer as a co-owner of a house.
- * Idempotent — silently succeeds if the row already exists.
- */
 export async function addHouseOwner(houseId: string, volunteerId: string) {
     const authError = await requireAdmin();
     if (authError) return { error: authError };
@@ -88,9 +88,6 @@ export async function addHouseOwner(houseId: string, volunteerId: string) {
     return { success: true };
 }
 
-/**
- * Remove a volunteer from a house's owner list.
- */
 export async function removeHouseOwner(houseId: string, volunteerId: string) {
     const authError = await requireAdmin();
     if (authError) return { error: authError };
@@ -159,13 +156,15 @@ export async function createVolunteer(formData: FormData) {
     const type = formData.get('type') as VolunteerType;
     const isWatchman = formData.get('isWatchman') === 'on'
         || formData.get('isWatchman') === 'true';
+    const isHospitality = formData.get('isHospitality') === 'on'
+        || formData.get('isHospitality') === 'true';
 
     if (!name || !type) {
         return { error: 'Name and type are required.' };
     }
 
     await prisma.volunteer.create({
-        data: { name, email, phone, type, isWatchman },
+        data: { name, email, phone, type, isWatchman, isHospitality },
     });
 
     revalidatePath('/volunteers');
@@ -183,23 +182,22 @@ export async function updateVolunteer(formData: FormData) {
     const email = ((formData.get('email') as string) || '').trim() || null;
     const phone = ((formData.get('phone') as string) || '').trim() || null;
     const type = (formData.get('type') as VolunteerType) || undefined;
-    // The checkbox is only present in the form when edited, so treat
-    // its absence as "no change" rather than "set to false". The form
-    // always includes a hidden `isWatchmanPresent=1` so we can tell the
-    // difference between "not rendered" and "rendered + unchecked".
+
     const isWatchmanPresent = formData.get('isWatchmanPresent') != null;
     const isWatchman = formData.get('isWatchman') === 'on'
         || formData.get('isWatchman') === 'true';
 
-    // Language override — admin can set or clear a volunteer's preferred language.
-    // Value is 'EN', 'ES', or '' (clear/null).
+    const isHospitalityPresent = formData.get('isHospitalityPresent') != null;
+    const isHospitality = formData.get('isHospitality') === 'on'
+        || formData.get('isHospitality') === 'true';
+
     const languageRaw = ((formData.get('language') as string) || '').trim();
     const languagePresent = formData.get('languagePresent') != null;
     const language: Language | null | undefined = languagePresent
         ? languageRaw === 'EN' || languageRaw === 'ES'
             ? (languageRaw as Language)
-            : null          // empty → clear the preference
-        : undefined;        // field not rendered → no change
+            : null
+        : undefined;
 
     if (!id) return { error: 'Volunteer id is required.' };
     if (!name) return { error: 'Name is required.' };
@@ -212,6 +210,7 @@ export async function updateVolunteer(formData: FormData) {
             phone,
             ...(type ? { type } : {}),
             ...(isWatchmanPresent ? { isWatchman } : {}),
+            ...(isHospitalityPresent ? { isHospitality } : {}),
             ...(languagePresent ? { language } : {}),
         },
     });
@@ -243,6 +242,7 @@ export async function createAssignment(formData: FormData) {
     const roomId = formData.get('roomId') as string;
     const startDate = new Date(formData.get('startDate') as string);
     const endDate = new Date(formData.get('endDate') as string);
+    const hospitalityMemberId = (formData.get('hospitalityMemberId') as string | null) || null;
 
     if (!volunteerId || !roomId || isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
         return { error: 'All fields are required.' };
@@ -252,7 +252,6 @@ export async function createAssignment(formData: FormData) {
         return { error: 'End date must be after start date.' };
     }
 
-    // Fetch the volunteer + room with house
     const volunteer = await prisma.volunteer.findUnique({ where: { id: volunteerId } });
     const room = await prisma.room.findUnique({
         where: { id: roomId },
@@ -263,12 +262,10 @@ export async function createAssignment(formData: FormData) {
         return { error: 'Volunteer or room not found.' };
     }
 
-    // Validate house accepts this volunteer type
     if (!room.house.acceptedTypes.includes(volunteer.type)) {
         return { error: `This house does not accept ${volunteer.type.replace('_', ' ').toLowerCase()}s.` };
     }
 
-    // Validate gender mixing: no SINGLE_BROTHER + SINGLE_SISTER in same room during overlapping dates
     const existingAssignments = await prisma.assignment.findMany({
         where: {
             roomId,
@@ -285,20 +282,74 @@ export async function createAssignment(formData: FormData) {
         return { error: 'Single brothers and single sisters cannot share the same room.' };
     }
 
-    // Check room capacity
     if (existingAssignments.length >= room.capacity) {
         return { error: 'This room is already at full capacity for the selected dates.' };
     }
 
     const newAssignment = await prisma.assignment.create({
-        data: { volunteerId, roomId, startDate, endDate },
+        data: {
+            volunteerId,
+            roomId,
+            startDate,
+            endDate,
+            ...(hospitalityMemberId ? { hospitalityMemberId } : {}),
+        },
     });
 
-    // Fire-and-forget: notify the volunteer and the house owners via WhatsApp.
-    // A WhatsApp failure must never block the assignment from being saved.
+    // Fire-and-forget notifications
     sendAssignmentConfirmation(newAssignment.id).catch((err) =>
         console.error('[createAssignment] confirmation send failed', err)
     );
+
+    revalidatePath('/planning');
+    return { success: true };
+}
+
+/**
+ * Change (or clear) the hospitality member for an existing assignment.
+ * Sends a cancellation to the old member (if any) and a pairing
+ * notification to the new member (if any). Fire-and-forget.
+ */
+export async function updateAssignmentHospitality(
+    assignmentId: string,
+    hospitalityMemberId: string | null,
+) {
+    const authError = await requireAdmin();
+    if (authError) return { error: authError };
+
+    // Fetch the current assignment to get the old hospitality member
+    const current = await prisma.assignment.findUnique({
+        where: { id: assignmentId },
+        include: {
+            hospitalityMember: { select: { id: true, name: true, phone: true, language: true } },
+            volunteer: { select: { name: true } },
+            room: { include: { house: { select: { name: true, address: true } } } },
+        },
+    });
+    if (!current) return { error: 'Assignment not found.' };
+
+    // Persist the change
+    await prisma.assignment.update({
+        where: { id: assignmentId },
+        data: { hospitalityMemberId },
+    });
+
+    // Notify old member of cancellation (fire-and-forget)
+    if (current.hospitalityMember?.phone && current.hospitalityMember.id !== hospitalityMemberId) {
+        sendHospitalityCancellationNotification({
+            assignmentId,
+            hospitalityMember: current.hospitalityMember as { id: string; name: string; phone: string; language: string | null },
+            volunteerName: current.volunteer.name,
+            houseName: current.room.house.name,
+        }).catch((err) => console.error('[updateAssignmentHospitality] cancellation send failed', err));
+    }
+
+    // Notify new member of pairing (fire-and-forget)
+    if (hospitalityMemberId) {
+        sendHospitalityPairingNotification(assignmentId).catch((err) =>
+            console.error('[updateAssignmentHospitality] pairing send failed', err)
+        );
+    }
 
     revalidatePath('/planning');
     return { success: true };
