@@ -25,11 +25,18 @@ import { join } from 'path';
 // ── Types & module-singleton state ────────────────────────────
 type ConnState = 'disconnected' | 'connecting' | 'qr' | 'connected';
 
+type WAMessageKey = { remoteJid?: string | null; id?: string | null; fromMe?: boolean | null };
+type WAMessageContent = { conversation?: string | null } & Record<string, unknown>;
+type WAMessage = {
+    key: WAMessageKey;
+    message?: WAMessageContent | null;
+};
+
 type BaileysSocket = {
     ev: {
         on: (event: string, listener: (...args: unknown[]) => void) => void;
     };
-    sendMessage: (jid: string, content: { text: string }) => Promise<unknown>;
+    sendMessage: (jid: string, content: { text: string }) => Promise<WAMessage | undefined>;
     logout: () => Promise<void>;
     end: (err?: Error) => void;
 };
@@ -47,6 +54,12 @@ type SockHolder = {
     lastError: string | null;
     connectedAt: number | null;
     startPromise: Promise<void> | null;
+    // Cache of recently sent message contents keyed by `${jid}|${id}`.
+    // Baileys calls `getMessage(key)` when a recipient asks for a retry
+    // (the "Waiting for this message" state on the recipient's side);
+    // we have to hand back the original plaintext so it can re-encrypt
+    // and resend with fresh ratchet keys.
+    msgCache: Map<string, WAMessageContent>;
 };
 
 const g = globalThis as unknown as { __cihWa?: SockHolder };
@@ -58,9 +71,11 @@ if (!g.__cihWa) {
         lastError: null,
         connectedAt: null,
         startPromise: null,
+        msgCache: new Map(),
     };
 }
 const holder = g.__cihWa;
+if (!holder.msgCache) holder.msgCache = new Map();
 
 const AUTH_DIR = process.env.WA_AUTH_DIR || join(process.cwd(), 'wa-auth');
 
@@ -128,6 +143,15 @@ async function startSocket(): Promise<void> {
         browser: ['Corn Island Hospitality', 'Chrome', '1.0.0'],
         syncFullHistory: false,
         markOnlineOnConnect: false,
+        // Without this callback, recipients (especially iPhones) get
+        // stuck on "Waiting for this message" the second time we send
+        // them anything: Baileys can't answer their retry receipts and
+        // the message is dropped silently. Returning the cached payload
+        // lets Baileys re-encrypt with fresh ratchet keys and resend.
+        getMessage: async (key: WAMessageKey): Promise<WAMessageContent | undefined> => {
+            const cacheKey = `${key.remoteJid ?? ''}|${key.id ?? ''}`;
+            return holder.msgCache.get(cacheKey);
+        },
         ...(version ? { version } : {}),
     });
 
@@ -249,7 +273,18 @@ export async function sendWhatsAppText(toPhone: string, text: string): Promise<v
         throw new Error(`WhatsApp not connected (state=${holder.state})`);
     }
     const jid = toPhone.replace(/^\+/, '') + '@s.whatsapp.net';
-    await holder.sock.sendMessage(jid, { text });
+    const sent = await holder.sock.sendMessage(jid, { text });
+    // Stash the plaintext so Baileys can answer any retry receipts the
+    // recipient sends back. Keep the cache bounded — 500 entries is more
+    // than enough for our send volume and avoids unbounded growth.
+    if (sent?.key?.id) {
+        const cacheKey = `${sent.key.remoteJid ?? jid}|${sent.key.id}`;
+        holder.msgCache.set(cacheKey, { conversation: text });
+        if (holder.msgCache.size > 500) {
+            const firstKey = holder.msgCache.keys().next().value;
+            if (firstKey !== undefined) holder.msgCache.delete(firstKey);
+        }
+    }
 }
 
 /**
