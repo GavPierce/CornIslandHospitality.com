@@ -2,6 +2,7 @@ import 'server-only';
 
 import { mkdirSync } from 'fs';
 import { join } from 'path';
+import { waLog } from './wa-logs';
 
 /**
  * WhatsApp transport using Baileys (a headless WhatsApp Web client).
@@ -37,6 +38,9 @@ type BaileysSocket = {
         on: (event: string, listener: (...args: unknown[]) => void) => void;
     };
     sendMessage: (jid: string, content: { text: string }) => Promise<WAMessage | undefined>;
+    onWhatsApp: (
+        ...jids: string[]
+    ) => Promise<Array<{ jid: string; exists: boolean }>>;
     logout: () => Promise<void>;
     end: (err?: Error) => void;
 };
@@ -129,11 +133,11 @@ async function startSocket(): Promise<void> {
     try {
         const v = await fetchLatestBaileysVersion();
         version = v.version;
-        console.log(
+        waLog.info(
             `[whatsapp] Using WA Web version ${version.join('.')} (latest=${v.isLatest}).`,
         );
     } catch (err) {
-        console.warn('[whatsapp] fetchLatestBaileysVersion failed, using built-in default.', err);
+        waLog.warn('[whatsapp] fetchLatestBaileysVersion failed, using built-in default.', err);
     }
 
     const sock = (makeWASocket as (opts: unknown) => BaileysSocket)({
@@ -150,7 +154,15 @@ async function startSocket(): Promise<void> {
         // lets Baileys re-encrypt with fresh ratchet keys and resend.
         getMessage: async (key: WAMessageKey): Promise<WAMessageContent | undefined> => {
             const cacheKey = `${key.remoteJid ?? ''}|${key.id ?? ''}`;
-            return holder.msgCache.get(cacheKey);
+            const hit = holder.msgCache.get(cacheKey);
+            // Log every retry receipt so we can see on prod whether
+            // (a) the recipient is actually requesting retries, and
+            // (b) we have the original plaintext to answer with.
+            waLog.info(
+                `[whatsapp] getMessage retry-receipt jid=${key.remoteJid} id=${key.id} ` +
+                    `cache=${hit ? 'HIT' : 'MISS'} cacheSize=${holder.msgCache.size}`,
+            );
+            return hit;
         },
         ...(version ? { version } : {}),
     });
@@ -159,7 +171,7 @@ async function startSocket(): Promise<void> {
 
     sock.ev.on('creds.update', () => {
         saveCreds().catch((err) => {
-            console.error('[whatsapp] saveCreds failed', err);
+            waLog.error('[whatsapp] saveCreds failed', err);
         });
     });
 
@@ -174,7 +186,7 @@ async function startSocket(): Promise<void> {
             holder.qr = null;
             holder.lastError = null;
             holder.connectedAt = Date.now();
-            console.log('[whatsapp] Connected.');
+            waLog.info('[whatsapp] Connected.');
         } else if (u.connection === 'close') {
             const code = u.lastDisconnect?.error?.output?.statusCode;
             const message = u.lastDisconnect?.error?.message ?? null;
@@ -183,12 +195,12 @@ async function startSocket(): Promise<void> {
             holder.state = 'disconnected';
             holder.lastError = message;
             holder.connectedAt = null;
-            console.warn(`[whatsapp] Disconnected (code=${code}, loggedOut=${loggedOut}).`);
+            waLog.warn(`[whatsapp] Disconnected (code=${code}, loggedOut=${loggedOut}).`);
             if (!loggedOut) {
                 // Auto-reconnect after a short backoff.
                 setTimeout(() => {
                     ensureWhatsAppStarted().catch((err) => {
-                        console.error('[whatsapp] Reconnect failed', err);
+                        waLog.error('[whatsapp] Reconnect failed', err);
                     });
                 }, 3000);
             } else {
@@ -213,7 +225,7 @@ export async function ensureWhatsAppStarted(): Promise<void> {
     holder.state = 'connecting';
     holder.startPromise = startSocket()
         .catch((err) => {
-            console.error('[whatsapp] Failed to start socket', err);
+            waLog.error('[whatsapp] Failed to start socket', err);
             holder.state = 'disconnected';
             holder.lastError = (err as Error)?.message ?? 'unknown error';
         })
@@ -273,6 +285,31 @@ export async function sendWhatsAppText(toPhone: string, text: string): Promise<v
         throw new Error(`WhatsApp not connected (state=${holder.state})`);
     }
     const jid = toPhone.replace(/^\+/, '') + '@s.whatsapp.net';
+    // Confirm this number is actually registered on WhatsApp. Without
+    // this check, sending to a non-WA number (or a wrong number) goes
+    // out as a single-checkmark message that never gets delivered and
+    // produces no error — which makes it impossible to debug.
+    try {
+        const [reg] = await holder.sock.onWhatsApp(jid);
+        if (!reg?.exists) {
+            throw new Error(
+                `Number ${toPhone} is not registered on WhatsApp (jid=${jid}).`,
+            );
+        }
+        // Baileys returns the canonical JID it knows for this number;
+        // use that — for some users it'll differ from the raw phone
+        // (LID-based accounts, ported numbers, etc.).
+        if (reg.jid && reg.jid !== jid) {
+            waLog.info(`[whatsapp] using canonical jid ${reg.jid} for ${toPhone}`);
+        }
+    } catch (err) {
+        // Re-throw "not registered" errors as-is; for any other lookup
+        // failure (network blip, etc.) log and proceed — the send
+        // itself will surface a different error if it really can't
+        // reach the recipient.
+        if ((err as Error).message?.includes('not registered')) throw err;
+        waLog.warn('[whatsapp] onWhatsApp lookup failed, proceeding with send', err);
+    }
     const sent = await holder.sock.sendMessage(jid, { text });
     // Stash the plaintext so Baileys can answer any retry receipts the
     // recipient sends back. Keep the cache bounded — 500 entries is more
@@ -284,6 +321,12 @@ export async function sendWhatsAppText(toPhone: string, text: string): Promise<v
             const firstKey = holder.msgCache.keys().next().value;
             if (firstKey !== undefined) holder.msgCache.delete(firstKey);
         }
+        waLog.info(
+            `[whatsapp] sent jid=${sent.key.remoteJid ?? jid} id=${sent.key.id} ` +
+                `cacheSize=${holder.msgCache.size}`,
+        );
+    } else {
+        waLog.warn(`[whatsapp] sendMessage returned no key for jid=${jid} — retries will fail`);
     }
 }
 
@@ -300,9 +343,9 @@ export async function sendWhatsAppOtp(toPhone: string, code: string): Promise<vo
     try {
         await sendWhatsAppText(toPhone, body);
     } catch (err) {
-        console.warn(
-            `[whatsapp] OTP send failed (${(err as Error).message}); logging instead.\n` +
-                `           to=${toPhone} code=${code}`,
+        waLog.warn(
+            `[whatsapp] OTP send failed (${(err as Error).message}); logging instead. ` +
+                `to=${toPhone} code=${code}`,
         );
     }
 }

@@ -66,11 +66,9 @@ export default function MyScheduleCard({
                     </div>
                     <h2 style={{ margin: '4px 0 0', fontSize: '1.3rem' }}>{userName}</h2>
                 </div>
-                {isWatchman && (
-                    <Link href="/watchman" className="btn btn-sm" style={{ border: '1px solid var(--border-color)', color: 'var(--accent-secondary)' }}>
-                        {t.myDashboard.viewFullSchedule}
-                    </Link>
-                )}
+                <Link href="/watchman" className="btn btn-sm" style={{ border: '1px solid var(--border-color)', color: 'var(--accent-secondary)' }}>
+                    {t.myDashboard.viewFullSchedule}
+                </Link>
             </div>
 
             <div style={{ display: 'grid', gap: 24, gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>

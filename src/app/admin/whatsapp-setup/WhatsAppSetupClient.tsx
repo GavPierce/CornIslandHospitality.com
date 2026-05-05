@@ -46,6 +46,11 @@ export default function WhatsAppSetupClient({
     const [remindersEnabled, setRemindersEnabled] = useState<boolean | null>(null);
     const [togglingReminders, setTogglingReminders] = useState(false);
 
+    // ─── Live transport logs ────────────────────────────
+    type LogEntry = { ts: number; level: 'info' | 'warn' | 'error'; message: string };
+    const [logs, setLogs] = useState<LogEntry[]>([]);
+    const [logsPaused, setLogsPaused] = useState(false);
+
     // ─── Test message form ──────────────────────────────
     const [testPhone, setTestPhone] = useState('');
     const [testText, setTestText] = useState('Hello from Corn Island Hospitality 👋');
@@ -107,6 +112,50 @@ export default function WhatsAppSetupClient({
             cancelled = true;
         };
     }, [canRunReminders]);
+
+    // Poll the WhatsApp transport log buffer every 2s so admins can
+    // diagnose delivery problems without tailing Docker logs in Coolify.
+    // Only sends `?since=` after the first fetch so the initial pull
+    // populates with the full buffer.
+    useEffect(() => {
+        if (!canRunReminders) return;
+        if (logsPaused) return;
+        let cancelled = false;
+        let lastTs = 0;
+        async function pull() {
+            try {
+                const url = lastTs
+                    ? `/api/admin/whatsapp-logs?since=${lastTs}`
+                    : '/api/admin/whatsapp-logs';
+                const res = await fetch(url, { cache: 'no-store' });
+                if (!res.ok) return;
+                const body = (await res.json()) as { entries: LogEntry[] };
+                if (cancelled || !body.entries?.length) return;
+                lastTs = body.entries[body.entries.length - 1].ts;
+                setLogs((prev) => {
+                    const next = [...prev, ...body.entries];
+                    // Cap client-side too so the panel can't OOM the tab.
+                    return next.length > 500 ? next.slice(next.length - 500) : next;
+                });
+            } catch {
+                /* transient network blip — try again next tick */
+            }
+        }
+        pull();
+        const id = setInterval(pull, 2000);
+        return () => {
+            cancelled = true;
+            clearInterval(id);
+        };
+    }, [canRunReminders, logsPaused]);
+
+    async function handleClearLogs() {
+        try {
+            await fetch('/api/admin/whatsapp-logs', { method: 'DELETE' });
+        } finally {
+            setLogs([]);
+        }
+    }
 
     // Load templates
     useEffect(() => {
@@ -507,6 +556,95 @@ export default function WhatsAppSetupClient({
                             </div>
                         </div>
                     ))}
+                </div>
+            )}
+
+            {canRunReminders && (
+                <div
+                    className="glass-panel"
+                    style={{ padding: 24, display: 'grid', gap: 12, marginTop: 18 }}
+                >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                        <div>
+                            <h2 style={{ margin: 0, fontSize: '1.05rem' }}>Transport logs</h2>
+                            <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>
+                                Live tail of the WhatsApp socket. Useful for diagnosing &quot;Waiting for this message&quot; and other delivery issues.
+                            </p>
+                        </div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                            <button
+                                type="button"
+                                onClick={() => setLogsPaused((p) => !p)}
+                                style={{
+                                    background: logsPaused ? 'rgba(251, 191, 36, 0.12)' : 'rgba(255,255,255,0.04)',
+                                    border: '1px solid var(--border-color)',
+                                    color: logsPaused ? '#fbbf24' : 'var(--text-secondary)',
+                                    padding: '6px 12px',
+                                    borderRadius: 8,
+                                    fontSize: '0.82rem',
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                {logsPaused ? 'Resume' : 'Pause'}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleClearLogs}
+                                style={{
+                                    background: 'rgba(255,255,255,0.04)',
+                                    border: '1px solid var(--border-color)',
+                                    color: 'var(--text-secondary)',
+                                    padding: '6px 12px',
+                                    borderRadius: 8,
+                                    fontSize: '0.82rem',
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                Clear
+                            </button>
+                        </div>
+                    </div>
+                    <div
+                        ref={(el) => {
+                            if (el && !logsPaused) el.scrollTop = el.scrollHeight;
+                        }}
+                        style={{
+                            background: '#0b0f14',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: 8,
+                            padding: 12,
+                            maxHeight: 360,
+                            overflowY: 'auto',
+                            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                            fontSize: '0.78rem',
+                            lineHeight: 1.5,
+                        }}
+                    >
+                        {logs.length === 0 ? (
+                            <div style={{ color: 'var(--text-tertiary)' }}>
+                                No log entries yet. Send a test message to see activity.
+                            </div>
+                        ) : (
+                            logs.map((entry, i) => {
+                                const color =
+                                    entry.level === 'error'
+                                        ? '#f87171'
+                                        : entry.level === 'warn'
+                                          ? '#fbbf24'
+                                          : '#9ca3af';
+                                const time = new Date(entry.ts).toLocaleTimeString();
+                                return (
+                                    <div key={`${entry.ts}-${i}`} style={{ color, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                                        <span style={{ color: '#6b7280' }}>{time}</span>{' '}
+                                        <span style={{ textTransform: 'uppercase', fontWeight: 600, marginRight: 6 }}>
+                                            {entry.level}
+                                        </span>
+                                        <span style={{ color: 'var(--text-primary)' }}>{entry.message}</span>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
                 </div>
             )}
         </div>
