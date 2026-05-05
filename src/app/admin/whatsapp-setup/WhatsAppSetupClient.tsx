@@ -23,6 +23,7 @@ const TEMPLATE_CONFIGS = [
     { id: 'VOLUNTEER_DEPARTURE', label: 'Volunteer Departure', vars: '{name}, {houseName}, {roomName}' },
     { id: 'ASSIGNMENT_CONFIRMATION', label: 'Assignment Confirmation (Volunteer)', vars: '{volunteerName}, {houseName}, {houseAddress}, {roomName}, {startDate}, {endDate}' },
     { id: 'OWNER_NOTIFICATION', label: 'Owner Notification', vars: '{ownerName}, {volunteerName}, {houseName}, {roomName}, {startDate}, {endDate}' },
+    { id: 'FAQ_MAP', label: 'FAQ & Island Map Caption (Follow-up Message)', vars: '{volunteerName}, {houseName}' },
 ];
 
 export default function WhatsAppSetupClient({
@@ -556,6 +557,56 @@ export default function WhatsAppSetupClient({
                             </div>
                         </div>
                     ))}
+
+                    <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: 20, marginTop: 24 }}>
+                        <h3 style={{ margin: '0 0 4px 0', fontSize: '1rem', fontWeight: 600 }}>Island Map Image (Follow-up Message)</h3>
+                        <p style={{ margin: '0 0 12px 0', fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>
+                            Upload the image that will be sent alongside the FAQ text after a volunteer receives their assignment.
+                        </p>
+                        <form
+                            onSubmit={async (e) => {
+                                e.preventDefault();
+                                const form = e.target as HTMLFormElement;
+                                const fileInput = form.elements.namedItem('mapFile') as HTMLInputElement;
+                                if (!fileInput?.files?.length) return;
+                                
+                                const fd = new FormData();
+                                fd.append('file', fileInput.files[0]);
+                                
+                                try {
+                                    const res = await fetch('/api/admin/upload-map', {
+                                        method: 'POST',
+                                        body: fd,
+                                    });
+                                    if (res.ok) {
+                                        alert('Map uploaded successfully!');
+                                        form.reset();
+                                    } else {
+                                        const body = await res.json();
+                                        alert('Upload failed: ' + body.error);
+                                    }
+                                } catch (err) {
+                                    alert('Upload failed: ' + (err as Error).message);
+                                }
+                            }}
+                            style={{ display: 'flex', alignItems: 'center', gap: 12 }}
+                        >
+                            <input
+                                type="file"
+                                name="mapFile"
+                                accept="image/jpeg, image/png, image/webp"
+                                required
+                                style={{ ...inputStyle, width: 'auto', flex: 1 }}
+                            />
+                            <button
+                                type="submit"
+                                className="btn btn-sm"
+                                style={{ border: '1px solid var(--border-color)' }}
+                            >
+                                Upload Image
+                            </button>
+                        </form>
+                    </div>
                 </div>
             )}
 

@@ -158,6 +158,7 @@ enum ReminderKind {
   HOSPITALITY_PAIRING      // instant notification to hospitality member when paired
   HOSPITALITY_CANCELLATION // notification to hospitality member when they are replaced
   HOSPITALITY_ARRIVAL      // day-of reminder to hospitality member when their volunteer arrives
+  ASSIGNMENT_FAQ_MAP       // sent immediately after assignment confirmation with map and FAQ
 }
 
 /**

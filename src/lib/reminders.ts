@@ -1,7 +1,9 @@
 import 'server-only';
 
 import { prisma } from './prisma';
-import { ensureWhatsAppStarted, getWhatsAppStatus, sendWhatsAppText } from './whatsapp';
+import { ensureWhatsAppStarted, getWhatsAppStatus, sendWhatsAppText, sendWhatsAppImage } from './whatsapp';
+import fs from 'fs';
+import path from 'path';
 import { adminPhoneSet, normalizePhone } from './phone';
 import { getRemindersEnabled } from './settings';
 
@@ -31,7 +33,8 @@ type ReminderKind =
     | 'ASSIGNMENT_CONFIRMATION'
     | 'HOSPITALITY_PAIRING'
     | 'HOSPITALITY_CANCELLATION'
-    | 'HOSPITALITY_ARRIVAL';
+    | 'HOSPITALITY_ARRIVAL'
+    | 'ASSIGNMENT_FAQ_MAP';
 
 const DEFAULT_TZ = process.env.REMINDER_TZ || 'America/Managua';
 const DEFAULT_LANG: Language = 'ES';
@@ -223,6 +226,25 @@ async function msgOwnerNotification(params: {
         .replace(/{endDate}/g, to);
 }
 
+async function msgFaqMap(params: {
+    volunteerName: string;
+    houseName: string;
+    lang: Language;
+}): Promise<string> {
+    const { volunteerName, houseName, lang } = params;
+    
+    let template = await getMessageTemplate(`template.FAQ_MAP.${lang}`);
+    if (!template) {
+        template = lang === 'ES'
+            ? `¡Bienvenido/a a Corn Island, {volunteerName}!\n\nAquí tienes un mapa de la isla para ayudarte a ubicar *{houseName}* y otros lugares importantes.\n\n*Recordatorios básicos:*\n• Por favor trae tu propia botella de agua reusable.\n• Mantén las puertas de tu habitación cerradas cuando no estés.\n• ¡Disfruta tu estadía!`
+            : `Welcome to Corn Island, {volunteerName}!\n\nHere is a map of the island to help you locate *{houseName}* and other key spots.\n\n*Basic reminders:*\n• Please bring your own reusable water bottle.\n• Keep your room doors locked when you are out.\n• Enjoy your stay!`;
+    }
+
+    return template
+        .replace(/{volunteerName}/g, volunteerName)
+        .replace(/{houseName}/g, houseName);
+}
+
 // ── Hospitality message templates ────────────────────────────
 
 async function msgHospitalityPairing(params: {
@@ -372,10 +394,11 @@ function msgAdminDigest(params: {
  * exists for this (kind, phone, reference) triple.
  */
 async function sendReminder(params: {
-    kind: ReminderKind;
+    kind: ReminderKind | 'ASSIGNMENT_FAQ_MAP';
     phone: string;
     referenceId: string;
     text: string;
+    imagePath?: string;
 }): Promise<{ sent: boolean; skipped?: 'duplicate' | 'no-phone' | 'not-connected' }> {
     const phone = normalizePhone(params.phone);
     if (!phone) return { sent: false, skipped: 'no-phone' };
@@ -421,7 +444,11 @@ async function sendReminder(params: {
         return { sent: false, skipped: 'not-connected' };
     }
     try {
-        await sendWhatsAppText(phone, params.text);
+        if (params.imagePath) {
+            await sendWhatsAppImage(phone, params.imagePath, params.text);
+        } else {
+            await sendWhatsAppText(phone, params.text);
+        }
         return { sent: true };
     } catch (err) {
         console.error('[reminders] send failed', err);
@@ -497,6 +524,25 @@ export async function sendAssignmentConfirmation(assignmentId: string): Promise<
             referenceId: assignmentId,
             text,
         });
+
+        // Immediately send the FAQ/Map if it exists
+        const authDir = process.env.WA_AUTH_DIR || path.join(process.cwd(), 'wa-auth');
+        const mapImagePath = path.join(authDir, 'uploads', 'faq-map.jpg');
+        
+        if (fs.existsSync(mapImagePath)) {
+            const faqText = await msgFaqMap({
+                volunteerName: volunteer.name,
+                houseName: house.name,
+                lang,
+            });
+            await sendReminder({
+                kind: 'ASSIGNMENT_FAQ_MAP',
+                phone: volunteer.phone,
+                referenceId: assignmentId,
+                text: faqText,
+                imagePath: mapImagePath,
+            });
+        }
     }
 
     // ── House owner notifications (one per co-owner) ─────────

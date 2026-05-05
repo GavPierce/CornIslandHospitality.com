@@ -353,3 +353,44 @@ export async function sendWhatsAppOtp(toPhone: string, code: string): Promise<vo
         );
     }
 }
+
+/**
+ * Send an image via WhatsApp with an optional caption.
+ * Useful for maps, QR codes, or instructional graphics.
+ */
+export async function sendWhatsAppImage(toPhone: string, imagePath: string, caption?: string): Promise<void> {
+    await ensureWhatsAppStarted();
+    if (holder.state !== 'connected' || !holder.sock) {
+        throw new Error(`WhatsApp not connected (state=${holder.state})`);
+    }
+    
+    const jid = toPhone.replace(/^\+/, '') + '@s.whatsapp.net';
+    
+    try {
+        const [reg] = await holder.sock.onWhatsApp(jid);
+        if (!reg?.exists) {
+            throw new Error(`Number ${toPhone} is not registered on WhatsApp.`);
+        }
+    } catch (err) {
+        if ((err as Error).message?.includes('not registered')) throw err;
+        waLog.warn('[whatsapp] onWhatsApp lookup failed, proceeding with send', err);
+    }
+
+    try {
+        const sent = await holder.sock.sendMessage(jid, {
+            image: { url: imagePath },
+            caption: caption ?? '',
+        });
+
+        if (sent?.key?.id) {
+            holder.msgCache.set(sent.key.id, { conversation: caption });
+            if (holder.msgCache.size > 500) {
+                const firstKey = holder.msgCache.keys().next().value;
+                if (firstKey !== undefined) holder.msgCache.delete(firstKey);
+            }
+        }
+    } catch (err) {
+        waLog.error(`[whatsapp] Failed to send image to ${toPhone}`, err);
+        throw err;
+    }
+}
