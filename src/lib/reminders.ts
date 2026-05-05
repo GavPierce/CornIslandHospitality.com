@@ -730,11 +730,11 @@ export async function runDailyReminders(now: Date = new Date()): Promise<Reminde
             });
             const r = await sendReminder({
                 kind: 'HOSPITALITY_ARRIVAL',
-                phone: hm.phone,
+                phone: hm.phone as string,
                 referenceId: `hospitality-arrival-${a.id}`,
                 text,
             });
-            trackResult(summary, 'HOSPITALITY_ARRIVAL', hm.phone, r);
+            trackResult(summary, 'HOSPITALITY_ARRIVAL', hm.phone as string, r);
         }
     }
 
