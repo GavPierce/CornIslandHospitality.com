@@ -153,11 +153,13 @@ async function startSocket(): Promise<void> {
         // the message is dropped silently. Returning the cached payload
         // lets Baileys re-encrypt with fresh ratchet keys and resend.
         getMessage: async (key: WAMessageKey): Promise<WAMessageContent | undefined> => {
-            const cacheKey = `${key.remoteJid ?? ''}|${key.id ?? ''}`;
-            const hit = holder.msgCache.get(cacheKey);
-            // Log every retry receipt so we can see on prod whether
-            // (a) the recipient is actually requesting retries, and
-            // (b) we have the original plaintext to answer with.
+            // Key by message id alone. Retry receipts from iPhones often
+            // arrive with the recipient's LID (`<lid>@lid`) rather than
+            // the phone-number jid we originally sent to, so jid-based
+            // keys always miss. Message ids are globally unique enough
+            // on their own for our send volume.
+            const cacheKey = key.id ?? '';
+            const hit = cacheKey ? holder.msgCache.get(cacheKey) : undefined;
             waLog.info(
                 `[whatsapp] getMessage retry-receipt jid=${key.remoteJid} id=${key.id} ` +
                     `cache=${hit ? 'HIT' : 'MISS'} cacheSize=${holder.msgCache.size}`,
@@ -315,7 +317,9 @@ export async function sendWhatsAppText(toPhone: string, text: string): Promise<v
     // recipient sends back. Keep the cache bounded — 500 entries is more
     // than enough for our send volume and avoids unbounded growth.
     if (sent?.key?.id) {
-        const cacheKey = `${sent.key.remoteJid ?? jid}|${sent.key.id}`;
+        // See getMessage above — key by id alone so retry receipts that
+        // arrive with the recipient's LID jid still hit.
+        const cacheKey = sent.key.id;
         holder.msgCache.set(cacheKey, { conversation: text });
         if (holder.msgCache.size > 500) {
             const firstKey = holder.msgCache.keys().next().value;
