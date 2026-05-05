@@ -2,7 +2,7 @@
 
 import { requireAdmin } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { VolunteerType } from '@prisma/client';
+import { VolunteerType, Language } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 import { sendAssignmentConfirmation } from '@/lib/reminders';
 
@@ -11,7 +11,12 @@ import { sendAssignmentConfirmation } from '@/lib/reminders';
 export async function getHouses() {
     return prisma.house.findMany({
         include: {
-            owner: { select: { id: true, name: true, phone: true } },
+            owners: {
+                include: {
+                    volunteer: { select: { id: true, name: true, phone: true, language: true } },
+                },
+                orderBy: { createdAt: 'asc' },
+            },
             rooms: {
                 include: {
                     assignments: {
@@ -34,16 +39,24 @@ export async function createHouse(formData: FormData) {
     const name = formData.get('name') as string;
     const address = formData.get('address') as string;
     const acceptedTypes = formData.getAll('acceptedTypes') as VolunteerType[];
-    const ownerId = (formData.get('ownerId') as string | null) || null;
+    const ownerIds = formData.getAll('ownerIds') as string[];
 
     if (!name || !address || acceptedTypes.length === 0) {
         return { error: 'All fields are required.' };
     }
 
-    await prisma.house.create({
-        data: { name, address, acceptedTypes, ...(ownerId ? { ownerId } : {}) },
+    const house = await prisma.house.create({
+        data: {
+            name,
+            address,
+            acceptedTypes,
+            owners: ownerIds.length > 0
+                ? { create: ownerIds.map((volunteerId) => ({ volunteerId })) }
+                : undefined,
+        },
     });
 
+    void house; // suppress unused var warning
     revalidatePath('/planning');
     return { success: true };
 }
@@ -57,13 +70,33 @@ export async function deleteHouse(id: string) {
     return { success: true };
 }
 
-export async function updateHouseOwner(houseId: string, ownerId: string | null) {
+/**
+ * Add a single volunteer as a co-owner of a house.
+ * Idempotent — silently succeeds if the row already exists.
+ */
+export async function addHouseOwner(houseId: string, volunteerId: string) {
     const authError = await requireAdmin();
     if (authError) return { error: authError };
 
-    await prisma.house.update({
-        where: { id: houseId },
-        data: { ownerId },
+    await prisma.houseOwner.upsert({
+        where: { houseId_volunteerId: { houseId, volunteerId } },
+        create: { houseId, volunteerId },
+        update: {},
+    });
+
+    revalidatePath('/planning');
+    return { success: true };
+}
+
+/**
+ * Remove a volunteer from a house's owner list.
+ */
+export async function removeHouseOwner(houseId: string, volunteerId: string) {
+    const authError = await requireAdmin();
+    if (authError) return { error: authError };
+
+    await prisma.houseOwner.delete({
+        where: { houseId_volunteerId: { houseId, volunteerId } },
     });
 
     revalidatePath('/planning');
@@ -158,6 +191,16 @@ export async function updateVolunteer(formData: FormData) {
     const isWatchman = formData.get('isWatchman') === 'on'
         || formData.get('isWatchman') === 'true';
 
+    // Language override — admin can set or clear a volunteer's preferred language.
+    // Value is 'EN', 'ES', or '' (clear/null).
+    const languageRaw = ((formData.get('language') as string) || '').trim();
+    const languagePresent = formData.get('languagePresent') != null;
+    const language: Language | null | undefined = languagePresent
+        ? languageRaw === 'EN' || languageRaw === 'ES'
+            ? (languageRaw as Language)
+            : null          // empty → clear the preference
+        : undefined;        // field not rendered → no change
+
     if (!id) return { error: 'Volunteer id is required.' };
     if (!name) return { error: 'Name is required.' };
 
@@ -169,6 +212,7 @@ export async function updateVolunteer(formData: FormData) {
             phone,
             ...(type ? { type } : {}),
             ...(isWatchmanPresent ? { isWatchman } : {}),
+            ...(languagePresent ? { language } : {}),
         },
     });
 
@@ -250,7 +294,7 @@ export async function createAssignment(formData: FormData) {
         data: { volunteerId, roomId, startDate, endDate },
     });
 
-    // Fire-and-forget: notify the volunteer and the house owner via WhatsApp.
+    // Fire-and-forget: notify the volunteer and the house owners via WhatsApp.
     // A WhatsApp failure must never block the assignment from being saved.
     sendAssignmentConfirmation(newAssignment.id).catch((err) =>
         console.error('[createAssignment] confirmation send failed', err)

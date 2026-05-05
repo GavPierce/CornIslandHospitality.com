@@ -370,7 +370,11 @@ export async function sendAssignmentConfirmation(assignmentId: string): Promise<
                 include: {
                     house: {
                         include: {
-                            owner: { select: { name: true, phone: true, language: true } },
+                            owners: {
+                                include: {
+                                    volunteer: { select: { id: true, name: true, phone: true, language: true } },
+                                },
+                            },
                         },
                     },
                 },
@@ -386,7 +390,9 @@ export async function sendAssignmentConfirmation(assignmentId: string): Promise<
             house: {
                 name: string;
                 address: string;
-                owner: { name: string; phone: string | null; language: Language | null } | null;
+                owners: Array<{
+                    volunteer: { id: string; name: string; phone: string | null; language: Language | null };
+                }>;
             };
         };
     };
@@ -413,11 +419,13 @@ export async function sendAssignmentConfirmation(assignmentId: string): Promise<
         });
     }
 
-    // ── House owner notification ─────────────────────────────
-    if (house.owner?.phone) {
-        const lang = house.owner.language ?? DEFAULT_LANG;
+    // ── House owner notifications (one per co-owner) ─────────
+    for (const ownerRow of house.owners) {
+        const owner = ownerRow.volunteer;
+        if (!owner.phone) continue;
+        const lang = owner.language ?? DEFAULT_LANG;
         const text = await msgOwnerNotification({
-            ownerName: house.owner.name,
+            ownerName: owner.name,
             volunteerName: volunteer.name,
             houseName: house.name,
             roomName: room.name,
@@ -427,9 +435,9 @@ export async function sendAssignmentConfirmation(assignmentId: string): Promise<
         });
         await sendReminder({
             kind: 'ASSIGNMENT_CONFIRMATION',
-            phone: house.owner.phone,
-            // distinct referenceId so owner + volunteer don't collide in the log
-            referenceId: `owner-${assignmentId}`,
+            phone: owner.phone,
+            // Distinct referenceId per owner so each co-owner gets their own log row
+            referenceId: `owner-${owner.id}-${assignmentId}`,
             text,
         });
     }

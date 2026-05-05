@@ -11,6 +11,7 @@ type VolunteerWithAssignments = {
     email: string | null;
     phone: string | null;
     type: string;
+    language: string | null;
     isWatchman: boolean;
     assignments: {
         id: string;
@@ -165,7 +166,7 @@ export default function VolunteersClient({
                                                             display: 'grid',
                                                             gap: 8,
                                                             gridTemplateColumns:
-                                                                '1fr 1fr 1fr 1fr auto auto',
+                                                                '1fr 1fr 1fr 1fr auto auto auto',
                                                             alignItems: 'center',
                                                         }}
                                                     >
@@ -200,6 +201,18 @@ export default function VolunteersClient({
                                                             type="email"
                                                             className="form-input"
                                                         />
+                                                        {/* Language override — sentinel hidden input so server knows the field was rendered */}
+                                                        <input type="hidden" name="languagePresent" value="1" />
+                                                        <select
+                                                            name="language"
+                                                            defaultValue={v.language ?? ''}
+                                                            className="form-input"
+                                                            title="Preferred language for WhatsApp messages"
+                                                        >
+                                                            <option value="">🌐 Lang (not set)</option>
+                                                            <option value="EN">🇺🇸 English</option>
+                                                            <option value="ES">🇳🇮 Español</option>
+                                                        </select>
                                                         <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
                                                             <input
                                                                 type="hidden"

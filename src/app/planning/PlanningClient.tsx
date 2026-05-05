@@ -1,6 +1,6 @@
 'use client';
 
-import { createAssignment, deleteAssignment, createHouse, createRoom, deleteHouse, deleteRoom, updateHouseOwner } from '@/actions/housing';
+import { createAssignment, deleteAssignment, createHouse, createRoom, deleteHouse, deleteRoom, addHouseOwner, removeHouseOwner } from '@/actions/housing';
 import type { UserRole } from '@/lib/auth';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { useState } from 'react';
@@ -18,12 +18,16 @@ type Room = {
     }[];
 };
 
+type HouseOwnerEntry = {
+    volunteer: { id: string; name: string; phone: string | null };
+};
+
 type House = {
     id: string;
     name: string;
     address: string;
     acceptedTypes: string[];
-    owner: { id: string; name: string; phone: string | null } | null;
+    owners: HouseOwnerEntry[];
     rooms: Room[];
 };
 
@@ -61,9 +65,9 @@ export default function PlanningClient({
     const [success, setSuccess] = useState('');
     const [showHouseForm, setShowHouseForm] = useState(false);
     const [expandedHouse, setExpandedHouse] = useState<string | null>(null);
-    // Per-house owner-picker state: houseId → 'idle' | 'picking'
-    const [ownerPickerOpen, setOwnerPickerOpen] = useState<string | null>(null);
-    const [ownerPickerValue, setOwnerPickerValue] = useState<Record<string, string>>({});
+    // Per-house add-owner picker: houseId → selected volunteerId in the dropdown
+    const [addOwnerOpen, setAddOwnerOpen] = useState<string | null>(null);
+    const [addOwnerValue, setAddOwnerValue] = useState<Record<string, string>>({});
 
     const unassignedVolunteers = volunteers.filter((v) => v.assignments.length === 0);
 
@@ -161,14 +165,22 @@ export default function PlanningClient({
                                     </label>
                                 </div>
                             </div>
+                            {/* Multi-owner picker at creation time */}
                             <div className="form-group" style={{ marginBottom: 16 }}>
-                                <label htmlFor="house-owner">Owner (optional)</label>
-                                <select id="house-owner" name="ownerId">
-                                    <option value="">No owner assigned</option>
-                                    {volunteers.map((v) => (
-                                        <option key={v.id} value={v.id}>{v.name}</option>
-                                    ))}
-                                </select>
+                                <label>Owners (optional — select one or more)</label>
+                                <div className="checkbox-group" style={{ maxHeight: 160, overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '8px 12px' }}>
+                                    {volunteers.length === 0 ? (
+                                        <span style={{ fontSize: '0.82rem', color: 'var(--text-tertiary)' }}>No volunteers yet</span>
+                                    ) : (
+                                        volunteers.map((v) => (
+                                            <label key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                <input type="checkbox" name="ownerIds" value={v.id} style={{ width: 16, height: 16 }} />
+                                                <span style={{ fontSize: '0.85rem' }}>{v.name}</span>
+                                                <span className={typeBadgeClass(v.type)} style={{ fontSize: '0.72rem' }}>{typeLabel(v.type)}</span>
+                                            </label>
+                                        ))
+                                    )}
+                                </div>
                             </div>
                             <button type="submit" className="btn btn-primary">{t.dashboard.createHouse}</button>
                         </form>
@@ -187,6 +199,10 @@ export default function PlanningClient({
                             const totalRoomCap = house.rooms.reduce((s, r) => s + r.capacity, 0);
                             const totalAssigned = house.rooms.reduce((s, r) => s + r.assignments.length, 0);
                             const isExpanded = expandedHouse === house.id;
+
+                            // Volunteers not already owning this house
+                            const currentOwnerIds = new Set(house.owners.map((o) => o.volunteer.id));
+                            const availableToAdd = volunteers.filter((v) => !currentOwnerIds.has(v.id));
 
                             return (
                                 <div key={house.id} className="glass-panel house-card">
@@ -213,79 +229,114 @@ export default function PlanningClient({
                                         ))}
                                     </div>
 
-                                    {/* ── Owner row ───────────────────── */}
+                                    {/* ── Owners row ───────────────────── */}
                                     <div style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: 8,
                                         padding: '8px 0',
                                         borderBottom: '1px solid var(--border-color)',
                                         marginBottom: 10,
-                                        flexWrap: 'wrap',
                                     }}>
-                                        <span style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', fontWeight: 600, minWidth: 44 }}>🏠 Owner:</span>
-                                        {house.owner ? (
-                                            <>
-                                                <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{house.owner.name}</span>
-                                                {house.owner.phone && (
-                                                    <a href={`tel:${house.owner.phone}`} style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', textDecoration: 'none' }}>
-                                                        📞 {house.owner.phone}
-                                                    </a>
-                                                )}
-                                                {isAdmin && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: house.owners.length > 0 ? 6 : 0 }}>
+                                            <span style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', fontWeight: 600, minWidth: 44 }}>🏠 Owners:</span>
+                                            {house.owners.length === 0 && (
+                                                <span style={{ fontSize: '0.82rem', color: 'var(--text-tertiary)' }}>None</span>
+                                            )}
+                                        </div>
+
+                                        {/* Owner chips */}
+                                        {house.owners.length > 0 && (
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
+                                                {house.owners.map((ownerRow) => (
+                                                    <div
+                                                        key={ownerRow.volunteer.id}
+                                                        style={{
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: 4,
+                                                            padding: '3px 8px',
+                                                            background: 'rgba(var(--accent-rgb, 99,102,241), 0.1)',
+                                                            border: '1px solid rgba(var(--accent-rgb, 99,102,241), 0.25)',
+                                                            borderRadius: 999,
+                                                            fontSize: '0.8rem',
+                                                            fontWeight: 500,
+                                                        }}
+                                                    >
+                                                        <span>{ownerRow.volunteer.name}</span>
+                                                        {ownerRow.volunteer.phone && (
+                                                            <a
+                                                                href={`tel:${ownerRow.volunteer.phone}`}
+                                                                style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', textDecoration: 'none' }}
+                                                            >
+                                                                📞
+                                                            </a>
+                                                        )}
+                                                        {isAdmin && (
+                                                            <button
+                                                                title={`Remove ${ownerRow.volunteer.name} as owner`}
+                                                                style={{
+                                                                    background: 'none',
+                                                                    border: 'none',
+                                                                    cursor: 'pointer',
+                                                                    padding: '0 2px',
+                                                                    lineHeight: 1,
+                                                                    color: 'var(--text-tertiary)',
+                                                                    fontSize: '0.75rem',
+                                                                }}
+                                                                onClick={() => removeHouseOwner(house.id, ownerRow.volunteer.id)}
+                                                            >
+                                                                ✕
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {/* Add owner picker */}
+                                        {isAdmin && (
+                                            addOwnerOpen === house.id ? (
+                                                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 4 }}>
+                                                    <select
+                                                        style={{ flex: 1, minWidth: 0, padding: '5px 8px', fontSize: '0.82rem' }}
+                                                        value={addOwnerValue[house.id] ?? ''}
+                                                        onChange={(e) => setAddOwnerValue((prev) => ({ ...prev, [house.id]: e.target.value }))}
+                                                    >
+                                                        <option value="">— select volunteer —</option>
+                                                        {availableToAdd.map((v) => (
+                                                            <option key={v.id} value={v.id}>{v.name}</option>
+                                                        ))}
+                                                    </select>
+                                                    <button
+                                                        className="btn btn-primary btn-sm"
+                                                        disabled={!addOwnerValue[house.id]}
+                                                        onClick={async () => {
+                                                            const vid = addOwnerValue[house.id];
+                                                            if (!vid) return;
+                                                            await addHouseOwner(house.id, vid);
+                                                            setAddOwnerOpen(null);
+                                                            setAddOwnerValue((prev) => ({ ...prev, [house.id]: '' }));
+                                                        }}
+                                                    >
+                                                        Add
+                                                    </button>
                                                     <button
                                                         className="btn btn-sm"
-                                                        style={{ marginLeft: 'auto', fontSize: '0.72rem', border: '1px solid var(--border-color)', color: 'var(--text-tertiary)' }}
-                                                        onClick={() => { setOwnerPickerOpen(ownerPickerOpen === house.id ? null : house.id); }}
+                                                        style={{ border: '1px solid var(--border-color)' }}
+                                                        onClick={() => setAddOwnerOpen(null)}
                                                     >
-                                                        Change
+                                                        Cancel
                                                     </button>
-                                                )}
-                                            </>
-                                        ) : (
-                                            isAdmin ? (
-                                                <button
-                                                    className="btn btn-sm"
-                                                    style={{ fontSize: '0.78rem', border: '1px solid var(--border-color)', color: 'var(--accent-secondary)' }}
-                                                    onClick={() => setOwnerPickerOpen(ownerPickerOpen === house.id ? null : house.id)}
-                                                >
-                                                    + Assign Owner
-                                                </button>
+                                                </div>
                                             ) : (
-                                                <span style={{ fontSize: '0.82rem', color: 'var(--text-tertiary)' }}>None</span>
+                                                availableToAdd.length > 0 && (
+                                                    <button
+                                                        className="btn btn-sm"
+                                                        style={{ fontSize: '0.78rem', border: '1px solid var(--border-color)', color: 'var(--accent-secondary)' }}
+                                                        onClick={() => setAddOwnerOpen(house.id)}
+                                                    >
+                                                        + Add Owner
+                                                    </button>
+                                                )
                                             )
-                                        )}
-                                        {/* Inline picker */}
-                                        {isAdmin && ownerPickerOpen === house.id && (
-                                            <div style={{ display: 'flex', gap: 6, width: '100%', marginTop: 4, flexWrap: 'wrap' }}>
-                                                <select
-                                                    style={{ flex: 1, minWidth: 0, padding: '6px 8px', fontSize: '0.82rem' }}
-                                                    value={ownerPickerValue[house.id] ?? house.owner?.id ?? ''}
-                                                    onChange={(e) => setOwnerPickerValue((prev) => ({ ...prev, [house.id]: e.target.value }))}
-                                                >
-                                                    <option value="">No owner</option>
-                                                    {volunteers.map((v) => (
-                                                        <option key={v.id} value={v.id}>{v.name}</option>
-                                                    ))}
-                                                </select>
-                                                <button
-                                                    className="btn btn-primary btn-sm"
-                                                    onClick={async () => {
-                                                        const newId = ownerPickerValue[house.id] ?? null;
-                                                        await updateHouseOwner(house.id, newId || null);
-                                                        setOwnerPickerOpen(null);
-                                                    }}
-                                                >
-                                                    Save
-                                                </button>
-                                                <button
-                                                    className="btn btn-sm"
-                                                    style={{ border: '1px solid var(--border-color)' }}
-                                                    onClick={() => setOwnerPickerOpen(null)}
-                                                >
-                                                    Cancel
-                                                </button>
-                                            </div>
                                         )}
                                     </div>
 

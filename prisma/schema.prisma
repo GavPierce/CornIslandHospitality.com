@@ -32,8 +32,7 @@ model House {
   name             String
   address          String
   acceptedTypes    VolunteerType[] // e.g. [SINGLE_SISTER, MARRIED_COUPLE]
-  ownerId          String?         // optional link to the volunteer who owns/hosts this house
-  owner            Volunteer?      @relation("HouseOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  owners           HouseOwner[]    // volunteers who co-own/host this house
   rooms            Room[]
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
@@ -60,9 +59,21 @@ model Volunteer {
   isWatchman    Boolean       @default(false) // also stands night-watch shifts
   assignments   Assignment[]
   shifts        WatchmanShift[]
-  ownedHouses   House[]       @relation("HouseOwner")
+  ownedHouses   HouseOwner[]  // join rows where this volunteer is a house owner
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
+}
+
+// Many-to-many: a house can have multiple owners, a volunteer can own multiple houses
+model HouseOwner {
+  houseId     String
+  house       House     @relation(fields: [houseId], references: [id], onDelete: Cascade)
+  volunteerId String
+  volunteer   Volunteer @relation(fields: [volunteerId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@id([houseId, volunteerId])
+  @@index([volunteerId])
 }
 
 model Assignment {
