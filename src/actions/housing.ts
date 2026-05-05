@@ -1,6 +1,6 @@
 'use server';
 
-import { requireAdmin } from '@/lib/auth';
+import { requireElevatedAccess } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { VolunteerType, Language } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
@@ -38,7 +38,7 @@ export async function getHouses() {
 }
 
 export async function createHouse(formData: FormData) {
-    const authError = await requireAdmin();
+    const authError = await requireElevatedAccess();
     if (authError) return { error: authError };
 
     const name = formData.get('name') as string;
@@ -66,7 +66,7 @@ export async function createHouse(formData: FormData) {
 }
 
 export async function deleteHouse(id: string) {
-    const authError = await requireAdmin();
+    const authError = await requireElevatedAccess();
     if (authError) return { error: authError };
 
     await prisma.house.delete({ where: { id } });
@@ -75,7 +75,7 @@ export async function deleteHouse(id: string) {
 }
 
 export async function addHouseOwner(houseId: string, volunteerId: string) {
-    const authError = await requireAdmin();
+    const authError = await requireElevatedAccess();
     if (authError) return { error: authError };
 
     await prisma.houseOwner.upsert({
@@ -89,7 +89,7 @@ export async function addHouseOwner(houseId: string, volunteerId: string) {
 }
 
 export async function removeHouseOwner(houseId: string, volunteerId: string) {
-    const authError = await requireAdmin();
+    const authError = await requireElevatedAccess();
     if (authError) return { error: authError };
 
     await prisma.houseOwner.delete({
@@ -103,7 +103,7 @@ export async function removeHouseOwner(houseId: string, volunteerId: string) {
 // ─── Rooms ───────────────────────────────────────────
 
 export async function createRoom(formData: FormData) {
-    const authError = await requireAdmin();
+    const authError = await requireElevatedAccess();
     if (authError) return { error: authError };
 
     const name = formData.get('name') as string;
@@ -124,7 +124,7 @@ export async function createRoom(formData: FormData) {
 }
 
 export async function deleteRoom(id: string) {
-    const authError = await requireAdmin();
+    const authError = await requireElevatedAccess();
     if (authError) return { error: authError };
 
     await prisma.room.delete({ where: { id } });
@@ -147,7 +147,7 @@ export async function getVolunteers() {
 }
 
 export async function createVolunteer(formData: FormData) {
-    const authError = await requireAdmin();
+    const authError = await requireElevatedAccess();
     if (authError) return { error: authError };
 
     const name = formData.get('name') as string;
@@ -174,7 +174,7 @@ export async function createVolunteer(formData: FormData) {
 }
 
 export async function updateVolunteer(formData: FormData) {
-    const authError = await requireAdmin();
+    const authError = await requireElevatedAccess();
     if (authError) return { error: authError };
 
     const id = (formData.get('id') as string)?.trim();
@@ -222,7 +222,7 @@ export async function updateVolunteer(formData: FormData) {
 }
 
 export async function deleteVolunteer(id: string) {
-    const authError = await requireAdmin();
+    const authError = await requireElevatedAccess();
     if (authError) return { error: authError };
 
     await prisma.volunteer.delete({ where: { id } });
@@ -235,7 +235,7 @@ export async function deleteVolunteer(id: string) {
 // ─── Assignments ─────────────────────────────────────
 
 export async function createAssignment(formData: FormData) {
-    const authError = await requireAdmin();
+    const authError = await requireElevatedAccess();
     if (authError) return { error: authError };
 
     const volunteerId = formData.get('volunteerId') as string;
@@ -314,7 +314,7 @@ export async function updateAssignmentHospitality(
     assignmentId: string,
     hospitalityMemberId: string | null,
 ) {
-    const authError = await requireAdmin();
+    const authError = await requireElevatedAccess();
     if (authError) return { error: authError };
 
     // Fetch the current assignment to get the old hospitality member
@@ -356,7 +356,7 @@ export async function updateAssignmentHospitality(
 }
 
 export async function deleteAssignment(id: string) {
-    const authError = await requireAdmin();
+    const authError = await requireElevatedAccess();
     if (authError) return { error: authError };
 
     await prisma.assignment.delete({ where: { id } });

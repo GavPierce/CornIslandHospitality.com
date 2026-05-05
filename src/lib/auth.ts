@@ -1,6 +1,8 @@
 import { getSession, type Session } from '@/lib/session';
 
-export type UserRole = 'admin' | 'viewer';
+import { prisma } from '@/lib/prisma';
+
+export type UserRole = 'admin' | 'hospitality' | 'viewer';
 
 /**
  * Return the current user's role. Users without a valid session are
@@ -10,7 +12,15 @@ export type UserRole = 'admin' | 'viewer';
 export async function getUserRole(): Promise<UserRole> {
     const session = await getSession();
     if (!session) return 'viewer';
-    return session.isAdmin ? 'admin' : 'viewer';
+    if (session.isAdmin) return 'admin';
+    if (session.identityType === 'VOLUNTEER') {
+        const v = await prisma.volunteer.findUnique({
+            where: { id: session.identityId },
+            select: { isHospitality: true }
+        });
+        if (v?.isHospitality) return 'hospitality';
+    }
+    return 'viewer';
 }
 
 /**
@@ -24,6 +34,14 @@ export async function requireAdmin(): Promise<string | null> {
     const role = await getUserRole();
     if (role !== 'admin') {
         return 'Permission denied. Admin access required.';
+    }
+    return null;
+}
+
+export async function requireElevatedAccess(): Promise<string | null> {
+    const role = await getUserRole();
+    if (role === 'viewer') {
+        return 'Permission denied. Elevated access required.';
     }
     return null;
 }

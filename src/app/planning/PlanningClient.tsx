@@ -61,7 +61,7 @@ export default function PlanningClient({
     volunteers: Volunteer[];
     role: UserRole;
 }) {
-    const isAdmin = role === 'admin';
+    const isAdmin = role === 'admin' || role === 'hospitality';
     const { t } = useTranslation();
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');

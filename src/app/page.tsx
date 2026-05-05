@@ -60,20 +60,20 @@ export default async function DashboardPage() {
   let myShifts: MyShift[] = [];
   let myAssignments: MyAssignment[] = [];
 
-  if (session?.identityType === 'WATCHMAN') {
-    const rows = await prisma.watchmanShift.findMany({
+  if (session?.identityId) {
+    const shiftRows = await prisma.watchmanShift.findMany({
       where: { volunteerId: session.identityId, date: { gte: today } },
       orderBy: { date: 'asc' },
       take: 10,
     });
-    myShifts = rows.map((s) => ({
+    myShifts = shiftRows.map((s) => ({
       id: s.id,
       date: s.date.toISOString(),
       slot: s.slot,
       notes: s.notes,
     }));
-  } else if (session?.identityType === 'VOLUNTEER') {
-    const rows = await prisma.assignment.findMany({
+
+    const assignmentRows = await prisma.assignment.findMany({
       where: { volunteerId: session.identityId, endDate: { gte: new Date() } },
       include: {
         room: { include: { house: true } },
@@ -81,7 +81,7 @@ export default async function DashboardPage() {
       },
       orderBy: { startDate: 'asc' },
     });
-    myAssignments = rows.map((a) => ({
+    myAssignments = assignmentRows.map((a) => ({
       id: a.id,
       startDate: a.startDate.toISOString(),
       endDate: a.endDate.toISOString(),

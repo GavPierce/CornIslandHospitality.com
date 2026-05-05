@@ -41,7 +41,7 @@ export default function VolunteersClient({
     volunteers: VolunteerWithAssignments[];
     role: UserRole;
 }) {
-    const isAdmin = role === 'admin';
+    const isAdmin = role === 'admin' || role === 'hospitality';
     const { t } = useTranslation();
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
