@@ -2,3 +2,4 @@
 .next
 node_modules
 prisma/node_modules
+wa-auth

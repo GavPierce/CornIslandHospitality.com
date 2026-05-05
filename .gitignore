@@ -41,3 +41,7 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+# WhatsApp (Baileys) pairing credentials — must never be committed and must
+# be mounted as a persistent volume in production (e.g. Coolify storage).
+/wa-auth/
