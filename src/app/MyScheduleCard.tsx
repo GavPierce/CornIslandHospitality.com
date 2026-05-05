@@ -55,8 +55,7 @@ export default function MyScheduleCard({
         });
     }
 
-    const isWatchman = identityType === 'WATCHMAN';
-    const isVolunteer = identityType === 'VOLUNTEER';
+    // Both blocks are now shown to everyone, since everyone is in the unified Volunteer table.
 
     return (
         <div className="glass-panel" style={{ padding: '20px 22px', marginBottom: 24 }}>
@@ -74,7 +73,7 @@ export default function MyScheduleCard({
                 )}
             </div>
 
-            {isWatchman && (
+            <div style={{ display: 'grid', gap: 24, gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
                 <div>
                     <h3 style={{ fontSize: '0.95rem', marginBottom: 8, color: 'var(--text-secondary)' }}>
                         {t.myDashboard.upcomingShifts}
@@ -116,9 +115,7 @@ export default function MyScheduleCard({
                         </ul>
                     )}
                 </div>
-            )}
 
-            {isVolunteer && (
                 <div>
                     <h3 style={{ fontSize: '0.95rem', marginBottom: 8, color: 'var(--text-secondary)' }}>
                         {t.myDashboard.myAssignments}
@@ -178,7 +175,7 @@ export default function MyScheduleCard({
                         </ul>
                     )}
                 </div>
-            )}
+            </div>
         </div>
     );
 }

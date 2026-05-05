@@ -108,21 +108,23 @@ export default function DashboardClient({
                 />
             )}
 
-            {/* Stats */}
-            <div className="stats-grid">
-                <div className="glass-panel stat-card">
-                    <span className="stat-label">{t.dashboard.totalHouses}</span>
-                    <span className="stat-value accent">{houseCount}</span>
+            {/* Stats (Elevated access only) */}
+            {(role === 'admin' || role === 'hospitality') && (
+                <div className="stats-grid">
+                    <div className="glass-panel stat-card">
+                        <span className="stat-label">{t.dashboard.totalHouses}</span>
+                        <span className="stat-value accent">{houseCount}</span>
+                    </div>
+                    <div className="glass-panel stat-card">
+                        <span className="stat-label">{t.dashboard.activeAssignments}</span>
+                        <span className="stat-value">{activeAssignments}</span>
+                    </div>
+                    <div className="glass-panel stat-card">
+                        <span className="stat-label">{t.dashboard.registeredVolunteers}</span>
+                        <span className="stat-value">{volunteerCount}</span>
+                    </div>
                 </div>
-                <div className="glass-panel stat-card">
-                    <span className="stat-label">{t.dashboard.activeAssignments}</span>
-                    <span className="stat-value">{activeAssignments}</span>
-                </div>
-                <div className="glass-panel stat-card">
-                    <span className="stat-label">{t.dashboard.registeredVolunteers}</span>
-                    <span className="stat-value">{volunteerCount}</span>
-                </div>
-            </div>
+            )}
 
             {/* ── Night Watchman Schedule at a Glance ─────────────── */}
             <div className="section">
