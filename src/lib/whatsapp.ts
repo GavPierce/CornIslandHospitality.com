@@ -37,7 +37,12 @@ type BaileysSocket = {
     ev: {
         on: (event: string, listener: (...args: unknown[]) => void) => void;
     };
-    sendMessage: (jid: string, content: { text: string }) => Promise<WAMessage | undefined>;
+    sendMessage: (
+        jid: string,
+        content:
+            | { text: string }
+            | { image: { url: string } | Buffer; caption?: string },
+    ) => Promise<WAMessage | undefined>;
     onWhatsApp: (
         ...jids: string[]
     ) => Promise<Array<{ jid: string; exists: boolean }>>;
