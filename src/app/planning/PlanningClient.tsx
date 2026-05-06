@@ -436,12 +436,12 @@ export default function PlanningClient({
                             <label htmlFor="assign-volunteer">{t.planning.volunteer}</label>
                             <select id="assign-volunteer" name="volunteerId" required>
                                 <option value="">{t.planning.selectVolunteer}</option>
-                                {unassignedVolunteers.map((v) => (
+                                {volunteers.map((v) => (
                                     <option key={v.id} value={v.id}>
                                         {v.name} ({typeLabel(v.type)})
                                     </option>
                                 ))}
-                                {unassignedVolunteers.length === 0 && (
+                                {volunteers.length === 0 && (
                                     <option disabled>{t.planning.allVolunteersAssigned}</option>
                                 )}
                             </select>
@@ -457,7 +457,7 @@ export default function PlanningClient({
                                     const effectiveCap = allMarried ? Math.max(r.capacity, 2) : r.capacity;
                                     return (
                                         <option key={r.id} value={r.id}>
-                                            {r.houseName} — {r.name} ({r.assignments.length}/{effectiveCap})
+                                            {r.houseName} — {r.name} (Current: {r.assignments.length}/{effectiveCap})
                                         </option>
                                     );
                                 })}
@@ -615,7 +615,7 @@ export default function PlanningClient({
                                                                                     const cap = allMarried ? Math.max(r.capacity, 2) : r.capacity;
                                                                                     return (
                                                                                         <option key={r.id} value={r.id}>
-                                                                                            {r.houseName} — {r.name} ({r.assignments.length}/{cap})
+                                                                                            {r.houseName} — {r.name} (Current: {r.assignments.length}/{cap})
                                                                                         </option>
                                                                                     );
                                                                                 })}

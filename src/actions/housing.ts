@@ -295,6 +295,18 @@ export async function createAssignment(formData: FormData) {
         return { error: 'This room is already at full capacity for the selected dates.' };
     }
 
+    const volunteerOverlap = await prisma.assignment.findFirst({
+        where: {
+            volunteerId,
+            startDate: { lt: endDate },
+            endDate: { gt: startDate },
+        }
+    });
+
+    if (volunteerOverlap) {
+        return { error: 'This volunteer is already assigned to a room during the selected dates.' };
+    }
+
     const newAssignment = await prisma.assignment.create({
         data: {
             volunteerId,

@@ -275,10 +275,10 @@ export default function VolunteersClient({
                                             {isAdmin && (
                                                 <td style={{ display: 'flex', gap: 8 }}>
                                                     <button
-                                                        className="btn btn-sm"
+                                                        className="btn btn-secondary btn-sm"
                                                         onClick={() => setEditingId(v.id)}
                                                     >
-                                                        Edit
+                                                        ✏️ Edit
                                                     </button>
                                                     <button
                                                         className="btn btn-danger btn-sm"
