@@ -5,6 +5,7 @@ import {
     getWhatsAppStatus,
     resetWhatsApp,
 } from '@/lib/whatsapp';
+import { startReminderScheduler } from '@/lib/reminders';
 import QRCode from 'qrcode';
 
 /**
@@ -38,6 +39,14 @@ export async function GET(request: Request) {
     // Kick off the socket on first request so the QR appears without
     // the operator having to do anything else.
     await ensureWhatsAppStarted();
+
+    // Ensure the reminder scheduler is running. Idempotent — safe to call
+    // on every poll; the `started` guard inside makes it a no-op after the
+    // first time. Done here because instrumentation.ts is not guaranteed to
+    // run in all standalone-build deployment configurations.
+    startReminderScheduler().catch((err) => {
+        console.error('[whatsapp-status] reminder scheduler failed to start', err);
+    });
 
     const status = getWhatsAppStatus();
     let qrDataUrl: string | null = null;
