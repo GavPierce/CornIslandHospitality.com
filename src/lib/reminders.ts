@@ -173,14 +173,14 @@ async function msgWatchmanShift(params: {
     const { name, date, slot, lang } = params;
     const when = formatLongDate(date, lang);
     const slotText = slotLabel(slot, lang);
-    
+
     let template = await getMessageTemplate(`template.WATCHMAN_SHIFT.${lang}`);
     if (!template) {
         template = lang === 'ES'
             ? `👷 *Recordatorio de turno* — Hola {name}!\n\nTienes tu turno de vigilancia *hoy ({date})*.\nHorario: {slot}.\n\nGracias por tu servicio. — Corn Island Hospitality`
             : `👷 *Shift reminder* — Hi {name}!\n\nYou have a shift *today ({date})*.\nSlot: {slot}.\n\nThanks for serving. — Corn Island Hospitality`;
     }
-    
+
     return template
         .replace(/{name}/g, name)
         .replace(/{date}/g, when)
@@ -240,12 +240,12 @@ async function msgVolunteerArrival(params: {
 }): Promise<string> {
     const { name, houseName, houseAddress, roomName, endDate, lang } = params;
     const until = formatLongDate(endDate, lang);
-    
+
     let template = await getMessageTemplate(`template.VOLUNTEER_ARRIVAL.${lang}`);
     if (!template) {
         template = lang === 'ES'
-            ? `🏠 *¡Bienvenido/a, {name}!*\n\nHoy comienza tu estadía en *{houseName}* ({houseAddress}).\nHabitación: *{roomName}*.\nFecha de salida prevista: *{endDate}*.\n\nSi necesitas ayuda, contacta a tu coordinador. — Corn Island Hospitality`
-            : `🏠 *Welcome, {name}!*\n\nYour stay at *{houseName}* ({houseAddress}) starts today.\nRoom: *{roomName}*.\nScheduled checkout: *{endDate}*.\n\nIf you need anything, reach out to your coordinator. — Corn Island Hospitality`;
+            ? `🏠 *¡Bienvenido/a, {name}!*\n\nHoy comienza tu estadía en *{houseName}* ({houseAddress}).\nHabitación: *{roomName}*.\nFecha de salida prevista: *{endDate}*.\n\nSi necesitas ayuda, contacta a tu contact. — Corn Island Hospitality`
+            : `🏠 *Welcome, {name}!*\n\nYour stay at *{houseName}* ({houseAddress}) starts today.\nRoom: *{roomName}*.\nScheduled checkout: *{endDate}*.\n\nIf you need anything, reach out to your contact. — Corn Island Hospitality`;
     }
 
     return template
@@ -263,7 +263,7 @@ async function msgVolunteerDeparture(params: {
     lang: Language;
 }): Promise<string> {
     const { name, houseName, roomName, lang } = params;
-    
+
     let template = await getMessageTemplate(`template.VOLUNTEER_DEPARTURE.${lang}`);
     if (!template) {
         template = lang === 'ES'
@@ -290,11 +290,11 @@ async function msgAssignmentConfirmation(params: {
     const { volunteerName, houseName, houseAddress, roomName, startDate, endDate, lang, hospitalityContact } = params;
     const from = formatLongDate(startDate, lang);
     const to = formatLongDate(endDate, lang);
-    
+
     let template = await getMessageTemplate(`template.ASSIGNMENT_CONFIRMATION.${lang}`);
     if (!template) {
         template = lang === 'ES'
-            ? `🏠 *Alojamiento confirmado — ¡Hola {volunteerName}!*\n\nSe te ha asignado una habitación en *{houseName}* ({houseAddress}).\nHabitación: *{roomName}*.\nFechas: {startDate} → {endDate}.{hospitalityBlock}\n\nSi tienes alguna pregunta, comunícate con tu coordinador.\n— Corn Island Hospitality`
+            ? `🏠 *Alojamiento confirmado — ¡Hola {volunteerName}!*\n\nSe te ha asignado una habitación en *{houseName}* ({houseAddress}).\nHabitación: *{roomName}*.\nFechas: {startDate} → {endDate}.{hospitalityBlock}\n\nSi tienes alguna pregunta, comunícate con tu contacto.\n— Corn Island Hospitality`
             : `🏠 *Housing confirmed — Hi {volunteerName}!*\n\nYou've been assigned a room at *{houseName}* ({houseAddress}).\nRoom: *{roomName}*.\nDates: {startDate} → {endDate}.{hospitalityBlock}\n\nIf you have any questions, reach out to your coordinator.\n— Corn Island Hospitality`;
     }
 
@@ -326,7 +326,7 @@ async function msgOwnerNotification(params: {
     const { ownerName, volunteerName, houseName, roomName, startDate, endDate, lang } = params;
     const from = formatLongDate(startDate, lang);
     const to = formatLongDate(endDate, lang);
-    
+
     let template = await getMessageTemplate(`template.OWNER_NOTIFICATION.${lang}`);
     if (!template) {
         template = lang === 'ES'
@@ -349,7 +349,7 @@ async function msgFaqMap(params: {
     lang: Language;
 }): Promise<string> {
     const { volunteerName, houseName, lang } = params;
-    
+
     let template = await getMessageTemplate(`template.FAQ_MAP.${lang}`);
     if (!template) {
         template = lang === 'ES'
@@ -440,7 +440,7 @@ function msgAdminDigest(params: {
     const { date, data, lang } = params;
     const when = formatLongDate(date, lang);
     const none = lang === 'ES' ? '—' : '—';
-    
+
     // Group shifts by slot
     const slotOrder: ShiftSlot[] = ['MORNING', 'LUNCH', 'AFTERNOON', 'EVENING', 'OVERNIGHT'];
     const groupedShifts = new Map<ShiftSlot, string[]>();
@@ -448,7 +448,7 @@ function msgAdminDigest(params: {
         if (!groupedShifts.has(s.slot)) groupedShifts.set(s.slot, []);
         groupedShifts.get(s.slot)!.push(s.name);
     }
-    
+
     let shiftsText = '';
     if (data.shifts.length === 0) {
         shiftsText = `  ${none}`;
@@ -467,16 +467,16 @@ function msgAdminDigest(params: {
         lines.push('');
         lines.push(
             `*Llegadas (${data.arrivals.length}):*\n` +
-                (data.arrivals.length
-                    ? data.arrivals.map((a) => `  • ${a.name} → ${a.house} · ${a.room}`).join('\n')
-                    : `  ${none}`),
+            (data.arrivals.length
+                ? data.arrivals.map((a) => `  • ${a.name} → ${a.house} · ${a.room}`).join('\n')
+                : `  ${none}`),
         );
         lines.push('');
         lines.push(
             `*Salidas (${data.departures.length}):*\n` +
-                (data.departures.length
-                    ? data.departures.map((a) => `  • ${a.name} ← ${a.house} · ${a.room}`).join('\n')
-                    : `  ${none}`),
+            (data.departures.length
+                ? data.departures.map((a) => `  • ${a.name} ← ${a.house} · ${a.room}`).join('\n')
+                : `  ${none}`),
         );
         lines.push('');
         lines.push(`*Turnos de vigilancia (${data.shifts.length}):*\n${shiftsText}`);
@@ -485,16 +485,16 @@ function msgAdminDigest(params: {
         lines.push('');
         lines.push(
             `*Arrivals (${data.arrivals.length}):*\n` +
-                (data.arrivals.length
-                    ? data.arrivals.map((a) => `  • ${a.name} → ${a.house} · ${a.room}`).join('\n')
-                    : `  ${none}`),
+            (data.arrivals.length
+                ? data.arrivals.map((a) => `  • ${a.name} → ${a.house} · ${a.room}`).join('\n')
+                : `  ${none}`),
         );
         lines.push('');
         lines.push(
             `*Departures (${data.departures.length}):*\n` +
-                (data.departures.length
-                    ? data.departures.map((a) => `  • ${a.name} ← ${a.house} · ${a.room}`).join('\n')
-                    : `  ${none}`),
+            (data.departures.length
+                ? data.departures.map((a) => `  • ${a.name} ← ${a.house} · ${a.room}`).join('\n')
+                : `  ${none}`),
         );
         lines.push('');
         lines.push(`*Shifts (${data.shifts.length}):*\n${shiftsText}`);
@@ -556,7 +556,7 @@ async function sendReminder(params: {
     if (status.state !== 'connected') {
         waLog.warn(
             `[reminders] Skipping send, WA not connected (state=${status.state}, waited=${waited}ms). ` +
-                `kind=${params.kind} to=${phone}`,
+            `kind=${params.kind} to=${phone}`,
         );
         return { sent: false, skipped: 'not-connected' };
     }
