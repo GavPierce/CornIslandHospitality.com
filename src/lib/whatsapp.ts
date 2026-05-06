@@ -388,11 +388,26 @@ export async function sendWhatsAppImage(toPhone: string, imagePath: string, capt
         });
 
         if (sent?.key?.id) {
-            holder.msgCache.set(sent.key.id, { conversation: caption });
+            // Cache the *actual* message proto returned by Baileys — for
+            // image sends this includes the `imageMessage` block with the
+            // media key. If we cache a synthesized {conversation: caption}
+            // here, retry receipts can't be answered (Baileys would try
+            // to re-send a text message instead of the image) and the
+            // recipient is stuck on "Waiting for this message" forever.
+            const cached = (sent.message ?? { conversation: caption ?? '' }) as WAMessageContent;
+            holder.msgCache.set(sent.key.id, cached);
             if (holder.msgCache.size > 500) {
                 const firstKey = holder.msgCache.keys().next().value;
                 if (firstKey !== undefined) holder.msgCache.delete(firstKey);
             }
+            waLog.info(
+                `[whatsapp] sent image jid=${sent.key.remoteJid ?? jid} id=${sent.key.id} ` +
+                    `cacheSize=${holder.msgCache.size}`,
+            );
+        } else {
+            waLog.warn(
+                `[whatsapp] sendMessage(image) returned no key for jid=${jid} — retries will fail`,
+            );
         }
     } catch (err) {
         waLog.error(`[whatsapp] Failed to send image to ${toPhone}`, err);

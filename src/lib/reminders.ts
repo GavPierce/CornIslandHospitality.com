@@ -642,11 +642,17 @@ export async function sendAssignmentConfirmation(assignmentId: string): Promise<
             text,
         });
 
-        // Immediately send the FAQ/Map if it exists
+        // Send the FAQ/Map as a follow-up if the image is on disk.
+        // Pause first so the welcome text is visibly delivered before
+        // the image. Baileys' sendMessage resolves when the message is
+        // queued on the socket — not when WhatsApp's server accepts it
+        // — so without a delay the image's media-upload handshake
+        // sometimes finalizes before the text and arrives out of order.
         const authDir = process.env.WA_AUTH_DIR || path.join(process.cwd(), 'wa-auth');
         const mapImagePath = path.join(authDir, 'uploads', 'faq-map.jpg');
-        
+
         if (fs.existsSync(mapImagePath)) {
+            await new Promise((r) => setTimeout(r, 2500));
             const faqText = await msgFaqMap({
                 volunteerName: volunteer.name,
                 houseName: house.name,
