@@ -7,6 +7,7 @@ type Assignment = {
     startDate: Date;
     endDate: Date;
     volunteer: { id: string; name: string; type: string };
+    hospitalityMember?: { id: string; name: string; phone: string | null } | null;
 };
 
 type Room = {
@@ -82,6 +83,7 @@ export default function MonthSchedulePdfButton({ houses }: { houses: House[] }) 
             roomName: string;
             startDate: Date;
             endDate: Date;
+            hospitalityContact: string | null;
         };
         const rows: Row[] = [];
         for (const house of houses) {
@@ -97,14 +99,19 @@ export default function MonthSchedulePdfButton({ houses }: { houses: House[] }) 
                             roomName: room.name,
                             startDate: aStart,
                             endDate: aEnd,
+                            hospitalityContact: a.hospitalityMember ? a.hospitalityMember.name : null,
                         });
                     }
                 }
             }
         }
 
-        // Sort by start date, then name
+        // Sort by house, then room, then start date
         rows.sort((a, b) => {
+            const h = a.houseName.localeCompare(b.houseName);
+            if (h !== 0) return h;
+            const r = a.roomName.localeCompare(b.roomName);
+            if (r !== 0) return r;
             const d = a.startDate.getTime() - b.startDate.getTime();
             return d !== 0 ? d : a.volunteerName.localeCompare(b.volunteerName);
         });
@@ -151,7 +158,10 @@ export default function MonthSchedulePdfButton({ houses }: { houses: House[] }) 
 
             tableRows += `
                 <tr>
-                    <td class="name-cell"><span class="vol-name">${row.volunteerName}</span><span class="type-badge" style="background:${color}20;color:${color};border:1px solid ${color}40;">${label2}</span></td>
+                    <td class="name-cell">
+                        <div style="margin-bottom:3px;"><span class="vol-name">${row.volunteerName}</span><span class="type-badge" style="background:${color}20;color:${color};border:1px solid ${color}40;">${label2}</span></div>
+                        ${row.hospitalityContact ? `<div style="font-size:9px;color:#6b7280;font-weight:500;">🤝 ${row.hospitalityContact}</div>` : ''}
+                    </td>
                     <td class="loc-cell">${row.houseName}<span class="room-name"> · ${row.roomName}</span></td>
                     ${dayCells}
                 </tr>`;
