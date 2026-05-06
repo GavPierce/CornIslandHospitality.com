@@ -426,6 +426,73 @@ async function msgHospitalityArrival(params: {
         .replace(/{roomName}/g, roomName);
 }
 
+async function msgOwnerGroupNotification(params: {
+    ownerName: string;
+    houseName: string;
+    startDate: Date;
+    endDate: Date;
+    members: Array<{ name: string; phone: string | null; roomName: string }>;
+    lang: Language;
+}): Promise<string> {
+    const { ownerName, houseName, startDate, endDate, members, lang } = params;
+    const from = formatLongDate(startDate, lang);
+    const to = formatLongDate(endDate, lang);
+    const count = members.length;
+    const memberList = members
+        .map((m, i) => i === 0
+            ? `  • *${m.name}* (${m.roomName}) — ${lang === 'ES' ? 'contacto principal' : 'main contact'}${m.phone ? ` · 📞 ${m.phone}` : ''}`
+            : `  • ${m.name} (${m.roomName})`)
+        .join('\n');
+    if (lang === 'ES') {
+        return `🏡 *Grupo de ${count} huéspedes — ¡Hola ${ownerName}!*\n\nUn grupo de *${count} voluntarios* ha sido asignado a tu casa (*${houseName}*).\nFechas: ${from} → ${to}.\n\n*Voluntarios:*\n${memberList}\n\n— Corn Island Hospitality`;
+    }
+    return `🏡 *Group of ${count} guests arriving — Hi ${ownerName}!*\n\n*${count} volunteers* have been assigned to your home (*${houseName}*).\nDates: ${from} → ${to}.\n\n*Volunteers:*\n${memberList}\n\n— Corn Island Hospitality`;
+}
+
+async function msgHospitalityGroupPairing(params: {
+    hospitalityName: string;
+    houseName: string;
+    houseAddress: string;
+    startDate: Date;
+    endDate: Date;
+    members: Array<{ name: string; phone: string | null; roomName: string }>;
+    lang: Language;
+}): Promise<string> {
+    const { hospitalityName, houseName, houseAddress, startDate, endDate, members, lang } = params;
+    const from = formatLongDate(startDate, lang);
+    const to = formatLongDate(endDate, lang);
+    const count = members.length;
+    const memberList = members
+        .map((m, i) => i === 0
+            ? `  • *${m.name}* (${m.roomName}) — ${lang === 'ES' ? 'contacto principal' : 'main contact'}${m.phone ? ` · 📞 ${m.phone}` : ''}`
+            : `  • ${m.name} (${m.roomName})`)
+        .join('\n');
+    if (lang === 'ES') {
+        return `🤝 *¡Hola ${hospitalityName}!* Has sido asignado/a para dar la bienvenida a un grupo de *${count} voluntarios* en *${houseName}* (${houseAddress}), del ${from} al ${to}.\n\n*Voluntarios:*\n${memberList}\n\n¡Por favor, comunícate con el contacto principal para coordinar la bienvenida!\n— Corn Island Hospitality`;
+    }
+    return `🤝 *Hi ${hospitalityName}!* You've been assigned to welcome a group of *${count} volunteers* at *${houseName}* (${houseAddress}), from ${from} to ${to}.\n\n*Volunteers:*\n${memberList}\n\nPlease reach out to the main contact to coordinate the welcome!\n— Corn Island Hospitality`;
+}
+
+async function msgHospitalityGroupArrival(params: {
+    hospitalityName: string;
+    houseName: string;
+    houseAddress: string;
+    members: Array<{ name: string; roomName: string }>;
+    lang: Language;
+}): Promise<string> {
+    const { hospitalityName, houseName, houseAddress, members, lang } = params;
+    const count = members.length;
+    const memberList = members
+        .map((m, i) => i === 0
+            ? `  • *${m.name}* (${m.roomName}) — ${lang === 'ES' ? 'contacto principal' : 'main contact'}`
+            : `  • ${m.name} (${m.roomName})`)
+        .join('\n');
+    if (lang === 'ES') {
+        return `🤝 *Recordatorio — ¡Hola ${hospitalityName}!* Un grupo de *${count} voluntarios* llega hoy a *${houseName}* (${houseAddress}).\n\n*Voluntarios:*\n${memberList}\n\n¡Hoy es el día de darles la bienvenida!\n— Corn Island Hospitality`;
+    }
+    return `🤝 *Reminder — Hi ${hospitalityName}!* A group of *${count} volunteers* arrives today at *${houseName}* (${houseAddress}).\n\n*Volunteers:*\n${memberList}\n\nToday's the day to welcome them!\n— Corn Island Hospitality`;
+}
+
 type DigestEntry = {
     arrivals: Array<{ name: string; house: string; room: string }>;
     departures: Array<{ name: string; house: string; room: string }>;
@@ -500,6 +567,179 @@ function msgAdminDigest(params: {
         lines.push(`*Shifts (${data.shifts.length}):*\n${shiftsText}`);
     }
     return lines.join('\n');
+}
+
+// ── Group notification debounce ─────────────────────────────
+// Prevents owners / hospitality contacts from receiving one message
+// per volunteer when a group is assigned to the same house on the
+// same date. A 60-second quiet window is awaited after the most
+// recent assignment before the consolidated message is sent.
+
+const GROUP_NOTIFY_DELAY_MS = 60_000;
+const groupNotifyTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+type GroupMember = { name: string; phone: string | null; roomName: string };
+
+async function deleteReminderLog(
+    kind: ReminderKind | 'ASSIGNMENT_FAQ_MAP',
+    recipientPhone: string,
+    referenceId: string,
+): Promise<void> {
+    try {
+        await (prisma as unknown as {
+            reminderLog: { deleteMany: (args: { where: Record<string, unknown> }) => Promise<unknown> };
+        }).reminderLog.deleteMany({
+            where: { kind, recipientPhone, referenceId },
+        });
+    } catch {
+        // ignore — row may not exist yet
+    }
+}
+
+function scheduleGroupOwnerNotification(params: {
+    ownerId: string;
+    ownerPhone: string;
+    ownerName: string;
+    ownerLang: Language;
+    houseId: string;
+    houseName: string;
+    houseAddress: string;
+    startDate: Date;
+    endDate: Date;
+}): void {
+    const key = `owner-${params.ownerId}-${params.houseId}-${dateKey(params.startDate)}`;
+    const existing = groupNotifyTimers.get(key);
+    if (existing) clearTimeout(existing);
+
+    const timer = setTimeout(async () => {
+        groupNotifyTimers.delete(key);
+        try {
+            const rawRows = await prisma.assignment.findMany({
+                where: { room: { houseId: params.houseId }, startDate: params.startDate },
+                include: {
+                    volunteer: { select: { name: true, phone: true } },
+                    room: { select: { name: true } },
+                },
+                orderBy: { createdAt: 'asc' },
+            }) as unknown as Array<{
+                volunteer: { name: string; phone: string | null };
+                room: { name: string };
+            }>;
+
+            const members: GroupMember[] = rawRows.map((a) => ({
+                name: a.volunteer.name,
+                phone: a.volunteer.phone,
+                roomName: a.room.name,
+            }));
+            if (members.length === 0) return;
+
+            const lang = params.ownerLang;
+            const referenceId = key;
+            const normalized = normalizePhone(params.ownerPhone);
+
+            const text = members.length >= 2
+                ? await msgOwnerGroupNotification({
+                    ownerName: params.ownerName,
+                    houseName: params.houseName,
+                    startDate: params.startDate,
+                    endDate: params.endDate,
+                    members,
+                    lang,
+                })
+                : await msgOwnerNotification({
+                    ownerName: params.ownerName,
+                    volunteerName: members[0].name,
+                    houseName: params.houseName,
+                    roomName: members[0].roomName,
+                    startDate: params.startDate,
+                    endDate: params.endDate,
+                    lang,
+                });
+
+            if (normalized) await deleteReminderLog('ASSIGNMENT_CONFIRMATION', normalized, referenceId);
+            await sendReminder({ kind: 'ASSIGNMENT_CONFIRMATION', phone: params.ownerPhone, referenceId, text });
+        } catch (err) {
+            waLog.error('[reminders] scheduleGroupOwnerNotification failed', err);
+        }
+    }, GROUP_NOTIFY_DELAY_MS);
+
+    groupNotifyTimers.set(key, timer);
+}
+
+function scheduleGroupHospitalityPairing(params: {
+    hmId: string;
+    hmPhone: string;
+    hmName: string;
+    hmLang: Language;
+    houseId: string;
+    houseName: string;
+    houseAddress: string;
+    startDate: Date;
+    endDate: Date;
+}): void {
+    const key = `hosp-${params.hmId}-${params.houseId}-${dateKey(params.startDate)}`;
+    const existing = groupNotifyTimers.get(key);
+    if (existing) clearTimeout(existing);
+
+    const timer = setTimeout(async () => {
+        groupNotifyTimers.delete(key);
+        try {
+            const rawRows = await prisma.assignment.findMany({
+                where: {
+                    room: { houseId: params.houseId },
+                    startDate: params.startDate,
+                    hospitalityMemberId: params.hmId,
+                },
+                include: {
+                    volunteer: { select: { name: true, phone: true } },
+                    room: { select: { name: true } },
+                },
+                orderBy: { createdAt: 'asc' },
+            }) as unknown as Array<{
+                volunteer: { name: string; phone: string | null };
+                room: { name: string };
+            }>;
+
+            const members: GroupMember[] = rawRows.map((a) => ({
+                name: a.volunteer.name,
+                phone: a.volunteer.phone,
+                roomName: a.room.name,
+            }));
+            if (members.length === 0) return;
+
+            const lang = params.hmLang;
+            const referenceId = key;
+            const normalized = normalizePhone(params.hmPhone);
+
+            const text = members.length >= 2
+                ? await msgHospitalityGroupPairing({
+                    hospitalityName: params.hmName,
+                    houseName: params.houseName,
+                    houseAddress: params.houseAddress,
+                    startDate: params.startDate,
+                    endDate: params.endDate,
+                    members,
+                    lang,
+                })
+                : await msgHospitalityPairing({
+                    hospitalityName: params.hmName,
+                    volunteerName: members[0].name,
+                    houseName: params.houseName,
+                    houseAddress: params.houseAddress,
+                    roomName: members[0].roomName,
+                    startDate: params.startDate,
+                    endDate: params.endDate,
+                    lang,
+                });
+
+            if (normalized) await deleteReminderLog('HOSPITALITY_PAIRING', normalized, referenceId);
+            await sendReminder({ kind: 'HOSPITALITY_PAIRING', phone: params.hmPhone, referenceId, text });
+        } catch (err) {
+            waLog.error('[reminders] scheduleGroupHospitalityPairing failed', err);
+        }
+    }, GROUP_NOTIFY_DELAY_MS);
+
+    groupNotifyTimers.set(key, timer);
 }
 
 // ── Send helper ───────────────────────────────────────────────
@@ -608,6 +848,7 @@ export async function sendAssignmentConfirmation(assignmentId: string): Promise<
         room: {
             name: string;
             house: {
+                id: string;
                 name: string;
                 address: string;
                 owners: Array<{
@@ -668,47 +909,35 @@ export async function sendAssignmentConfirmation(assignmentId: string): Promise<
         }
     }
 
-    // ── House owner notifications (one per co-owner) ─────────
+    // ── House owner notifications (group-debounced, 60 s quiet window) ──
     for (const ownerRow of house.owners) {
         const owner = ownerRow.volunteer;
         if (!owner.phone) continue;
-        const lang = owner.language ?? DEFAULT_LANG;
-        const text = await msgOwnerNotification({
+        scheduleGroupOwnerNotification({
+            ownerId: owner.id,
+            ownerPhone: owner.phone,
             ownerName: owner.name,
-            volunteerName: volunteer.name,
+            ownerLang: owner.language ?? DEFAULT_LANG,
+            houseId: house.id,
             houseName: house.name,
-            roomName: room.name,
+            houseAddress: house.address,
             startDate: assignment.startDate,
             endDate: assignment.endDate,
-            lang,
-        });
-        await sendReminder({
-            kind: 'ASSIGNMENT_CONFIRMATION',
-            phone: owner.phone,
-            referenceId: `owner-${owner.id}-${assignmentId}`,
-            text,
         });
     }
 
-    // ── Hospitality member pairing notification ────────────
+    // ── Hospitality member pairing notification (group-debounced) ──
     if (hospitalityMember?.phone) {
-        const lang = hospitalityMember.language ?? DEFAULT_LANG;
-        const text = await msgHospitalityPairing({
-            hospitalityName: hospitalityMember.name,
-            volunteerName: volunteer.name,
+        scheduleGroupHospitalityPairing({
+            hmId: hospitalityMember.id,
+            hmPhone: hospitalityMember.phone,
+            hmName: hospitalityMember.name,
+            hmLang: hospitalityMember.language ?? DEFAULT_LANG,
+            houseId: house.id,
             houseName: house.name,
             houseAddress: house.address,
-            roomName: room.name,
             startDate: assignment.startDate,
             endDate: assignment.endDate,
-            lang,
-        });
-        // Use a timestamp-based referenceId: pairings are event-driven, not once-per-day idempotent
-        await sendReminder({
-            kind: 'HOSPITALITY_PAIRING',
-            phone: hospitalityMember.phone,
-            referenceId: `pairing-${assignmentId}-${hospitalityMember.id}-${Date.now()}`,
-            text,
         });
     }
 }
@@ -887,14 +1116,17 @@ export async function runDailyReminders(now: Date = new Date()): Promise<Reminde
     }
 
     // ── Volunteer arrival ────────────────────────────────────
-    const arrivalDigest: DigestEntry['arrivals'] = [];
-    for (const a of arrivals as unknown as Array<{
+    type ArrivalRecord = {
         id: string;
         endDate: Date;
         volunteer: { name: string; phone: string | null; language: Language | null };
         hospitalityMember: { id: string; name: string; phone: string | null; language: Language | null } | null;
-        room: { name: string; house: { name: string; address: string } };
-    }>) {
+        room: { name: string; house: { id: string; name: string; address: string } };
+    };
+    const typedArrivals = arrivals as unknown as ArrivalRecord[];
+    const arrivalDigest: DigestEntry['arrivals'] = [];
+
+    for (const a of typedArrivals) {
         arrivalDigest.push({
             name: a.volunteer.name,
             house: a.room.house.name,
@@ -918,15 +1150,48 @@ export async function runDailyReminders(now: Date = new Date()): Promise<Reminde
             });
             trackResult(summary, 'VOLUNTEER_ARRIVAL', a.volunteer.phone, r);
         }
-        // ── Hospitality member arrival reminder ────────────────
-        if (a.hospitalityMember?.phone) {
-            const hm = a.hospitalityMember;
-            const lang = hm.language ?? DEFAULT_LANG;
+    }
+
+    // ── Hospitality member arrival reminders (grouped by house+date) ──
+    // Group arrivals by hospitality-member + house so a contact who is
+    // responsible for multiple volunteers at the same house gets ONE
+    // consolidated message instead of one per volunteer.
+    const hospitalityArrivalGroups = new Map<string, ArrivalRecord[]>();
+    for (const a of typedArrivals) {
+        if (!a.hospitalityMember?.phone) continue;
+        const groupKey = `${a.hospitalityMember.id}-${a.room.house.id}`;
+        if (!hospitalityArrivalGroups.has(groupKey)) hospitalityArrivalGroups.set(groupKey, []);
+        hospitalityArrivalGroups.get(groupKey)!.push(a);
+    }
+
+    for (const [, group] of hospitalityArrivalGroups) {
+        const hm = group[0].hospitalityMember!;
+        const house = group[0].room.house;
+        const lang = hm.language ?? DEFAULT_LANG;
+        if (group.length >= 2) {
+            const members = group.map((a) => ({ name: a.volunteer.name, roomName: a.room.name }));
+            const text = await msgHospitalityGroupArrival({
+                hospitalityName: hm.name,
+                houseName: house.name,
+                houseAddress: house.address,
+                members,
+                lang,
+            });
+            const referenceId = `hospitality-group-arrival-${hm.id}-${house.id}-${dateKey(today)}`;
+            const r = await sendReminder({
+                kind: 'HOSPITALITY_ARRIVAL',
+                phone: hm.phone as string,
+                referenceId,
+                text,
+            });
+            trackResult(summary, 'HOSPITALITY_ARRIVAL', hm.phone as string, r);
+        } else {
+            const a = group[0];
             const text = await msgHospitalityArrival({
                 hospitalityName: hm.name,
                 volunteerName: a.volunteer.name,
-                houseName: a.room.house.name,
-                houseAddress: a.room.house.address,
+                houseName: house.name,
+                houseAddress: house.address,
                 roomName: a.room.name,
                 lang,
             });
