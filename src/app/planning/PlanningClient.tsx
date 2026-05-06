@@ -1,6 +1,6 @@
 'use client';
 
-import { createAssignment, deleteAssignment, createHouse, createRoom, deleteHouse, deleteRoom, addHouseOwner, removeHouseOwner, updateAssignmentHospitality } from '@/actions/housing';
+import { createAssignment, deleteAssignment, createHouse, createRoom, deleteHouse, deleteRoom, addHouseOwner, removeHouseOwner, updateAssignmentHospitality, reassignRoom } from '@/actions/housing';
 import type { UserRole } from '@/lib/auth';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { useState } from 'react';
@@ -73,6 +73,8 @@ export default function PlanningClient({
     // Per-assignment hospitality picker: assignmentId → open state
     const [hospPickerOpen, setHospPickerOpen] = useState<string | null>(null);
     const [hospPickerValue, setHospPickerValue] = useState<Record<string, string>>({});
+    const [movePickerOpen, setMovePickerOpen] = useState<string | null>(null);
+    const [movePickerValue, setMovePickerValue] = useState<Record<string, string>>({});
 
     const hospitalityMembers = volunteers.filter((v) => v.isHospitality);
 
@@ -576,12 +578,60 @@ export default function PlanningClient({
                                                                         🤝 {a.hospitalityMember ? 'Change' : 'Assign'}
                                                                     </button>
                                                                     <button
+                                                                        className="btn btn-sm"
+                                                                        style={{ fontSize: '0.72rem', border: '1px solid rgba(59,130,246,0.4)', color: '#60a5fa' }}
+                                                                        onClick={() => {
+                                                                            setMovePickerOpen(movePickerOpen === a.id ? null : a.id);
+                                                                            setHospPickerOpen(null);
+                                                                        }}
+                                                                    >
+                                                                        🔄 Move
+                                                                    </button>
+                                                                    <button
                                                                         className="btn btn-danger btn-sm"
                                                                         onClick={() => deleteAssignment(a.id)}
                                                                     >
                                                                         ✕
                                                                     </button>
                                                                 </div>
+                                                                {movePickerOpen === a.id && (
+                                                                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginTop: 2 }}>
+                                                                        <select
+                                                                            style={{ padding: '4px 8px', fontSize: '0.8rem', minWidth: 200 }}
+                                                                            value={movePickerValue[a.id] ?? ''}
+                                                                            onChange={(e) => setMovePickerValue((prev) => ({ ...prev, [a.id]: e.target.value }))}
+                                                                        >
+                                                                            <option value=''>— select new room —</option>
+                                                                            {allRooms
+                                                                                .filter((r) => r.id !== room.id)
+                                                                                .map((r) => {
+                                                                                    const allMarried =
+                                                                                        r.assignments.length > 0 &&
+                                                                                        r.assignments.every((x) => x.volunteer.type === 'MARRIED_COUPLE');
+                                                                                    const cap = allMarried ? Math.max(r.capacity, 2) : r.capacity;
+                                                                                    return (
+                                                                                        <option key={r.id} value={r.id}>
+                                                                                            {r.houseName} — {r.name} ({r.assignments.length}/{cap})
+                                                                                        </option>
+                                                                                    );
+                                                                                })}
+                                                                        </select>
+                                                                        <button
+                                                                            className="btn btn-primary btn-sm"
+                                                                            disabled={!movePickerValue[a.id]}
+                                                                            onClick={async () => {
+                                                                                const newRoomId = movePickerValue[a.id];
+                                                                                if (!newRoomId) return;
+                                                                                const result = await reassignRoom(a.id, newRoomId);
+                                                                                if (result?.error) setError(result.error);
+                                                                                else setSuccess('Volunteer moved and all parties notified.');
+                                                                                setMovePickerOpen(null);
+                                                                                setMovePickerValue((prev) => ({ ...prev, [a.id]: '' }));
+                                                                            }}
+                                                                        >Move &amp; Notify</button>
+                                                                        <button className="btn btn-sm" style={{ border: '1px solid var(--border-color)' }} onClick={() => setMovePickerOpen(null)}>Cancel</button>
+                                                                    </div>
+                                                                )}
                                                                 {hospPickerOpen === a.id && (
                                                                     <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginTop: 2 }}>
                                                                         <select

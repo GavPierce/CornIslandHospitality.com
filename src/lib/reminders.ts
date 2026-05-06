@@ -1005,6 +1005,70 @@ export async function sendHospitalityCancellationNotification(params: {
     });
 }
 
+/**
+ * Notify all parties when a volunteer is moved to a different room/house.
+ * Called after the assignment's roomId has already been updated in the DB.
+ * Uses sendWhatsAppText directly (no ReminderLog) since this is a manual
+ * one-off admin action that should always fire.
+ */
+export async function sendRoomReassignmentNotification(params: {
+    volunteerName: string;
+    volunteerPhone: string | null;
+    volunteerLang: Language | null;
+    oldHouseName: string;
+    oldRoomName: string;
+    newHouseName: string;
+    newHouseAddress: string;
+    newRoomName: string;
+    startDate: Date;
+    endDate: Date;
+    oldHouseOwners: Array<{ name: string; phone: string | null; language: Language | null }>;
+    newHouseOwners: Array<{ name: string; phone: string | null; language: Language | null }>;
+}): Promise<void> {
+    const {
+        volunteerName, volunteerPhone, volunteerLang,
+        oldHouseName, oldRoomName,
+        newHouseName, newHouseAddress, newRoomName,
+        startDate, endDate,
+        oldHouseOwners, newHouseOwners,
+    } = params;
+
+    await ensureWhatsAppStarted();
+
+    // ── Volunteer ──────────────────────────────────────────────────
+    if (volunteerPhone) {
+        const lang = volunteerLang ?? DEFAULT_LANG;
+        const from = formatLongDate(startDate, lang);
+        const to = formatLongDate(endDate, lang);
+        const text = lang === 'ES'
+            ? `🔄 *Cambio de alojamiento — Hola ${volunteerName}!*\n\nTu alojamiento ha sido actualizado.\n\n*Anterior:* ${oldHouseName} — ${oldRoomName}\n*Nuevo:* ${newHouseName} (${newHouseAddress}) — ${newRoomName}\nFechas: ${from} → ${to}\n\nSi tienes preguntas, comunícate con tu coordinador.\n— Corn Island Hospitality`
+            : `🔄 *Room change — Hi ${volunteerName}!*\n\nYour housing has been updated.\n\n*Previous:* ${oldHouseName} — ${oldRoomName}\n*New:* ${newHouseName} (${newHouseAddress}) — ${newRoomName}\nDates: ${from} → ${to}\n\nIf you have questions, reach out to your coordinator.\n— Corn Island Hospitality`;
+        await sendWhatsAppText(volunteerPhone, text);
+    }
+
+    // ── Old house owners — volunteer is leaving ────────────────────
+    for (const owner of oldHouseOwners) {
+        if (!owner.phone) continue;
+        const lang = owner.language ?? DEFAULT_LANG;
+        const text = lang === 'ES'
+            ? `👋 *Voluntario trasladado — Hola ${owner.name}!*\n\n*${volunteerName}* ha sido reasignado/a a otra casa y ya no se quedará en *${oldRoomName}* (${oldHouseName}).\n\nGracias por su hospitalidad.\n— Corn Island Hospitality`
+            : `👋 *Volunteer moved — Hi ${owner.name}!*\n\n*${volunteerName}* has been reassigned to another home and will no longer be staying in *${oldRoomName}* (${oldHouseName}).\n\nThank you for your hospitality.\n— Corn Island Hospitality`;
+        await sendWhatsAppText(owner.phone, text);
+    }
+
+    // ── New house owners — volunteer is arriving ───────────────────
+    for (const owner of newHouseOwners) {
+        if (!owner.phone) continue;
+        const lang = owner.language ?? DEFAULT_LANG;
+        const from = formatLongDate(startDate, lang);
+        const to = formatLongDate(endDate, lang);
+        const text = lang === 'ES'
+            ? `🏡 *Nuevo huésped asignado — Hola ${owner.name}!*\n\n*${volunteerName}* ha sido reasignado/a a tu casa (*${newHouseName}*).\nHabitación: *${newRoomName}*.\nFechas: ${from} → ${to}.\n\n— Corn Island Hospitality`
+            : `🏡 *New guest assigned — Hi ${owner.name}!*\n\n*${volunteerName}* has been reassigned to your home (*${newHouseName}*).\nRoom: *${newRoomName}*.\nDates: ${from} → ${to}.\n\n— Corn Island Hospitality`;
+        await sendWhatsAppText(owner.phone, text);
+    }
+}
+
 export type ReminderRunSummary = {
     date: string;
     sent: number;

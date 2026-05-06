@@ -4,7 +4,7 @@ import { requireElevatedAccess } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { VolunteerType, Language } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
-import { sendAssignmentConfirmation, sendHospitalityPairingNotification, sendHospitalityCancellationNotification } from '@/lib/reminders';
+import { sendAssignmentConfirmation, sendHospitalityPairingNotification, sendHospitalityCancellationNotification, sendRoomReassignmentNotification } from '@/lib/reminders';
 
 // ─── Houses ──────────────────────────────────────────
 
@@ -370,6 +370,122 @@ export async function deleteAssignment(id: string) {
 
     await prisma.assignment.delete({ where: { id } });
     revalidatePath('/');
+    revalidatePath('/planning');
+    return { success: true };
+}
+
+/**
+ * Move an existing assignment to a different room, applying the same
+ * capacity and type-compatibility checks as createAssignment, then
+ * sending WhatsApp notifications to the volunteer, old house owners,
+ * and new house owners.
+ */
+export async function reassignRoom(
+    assignmentId: string,
+    newRoomId: string,
+) {
+    const authError = await requireElevatedAccess();
+    if (authError) return { error: authError };
+
+    const assignment = await prisma.assignment.findUnique({
+        where: { id: assignmentId },
+        include: {
+            volunteer: { select: { id: true, name: true, phone: true, language: true, type: true } },
+            room: {
+                include: {
+                    house: {
+                        include: {
+                            owners: {
+                                include: {
+                                    volunteer: { select: { name: true, phone: true, language: true } },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    });
+    if (!assignment) return { error: 'Assignment not found.' };
+    if (assignment.roomId === newRoomId) return { error: 'Volunteer is already in that room.' };
+
+    const newRoom = await prisma.room.findUnique({
+        where: { id: newRoomId },
+        include: {
+            house: {
+                include: {
+                    owners: {
+                        include: {
+                            volunteer: { select: { name: true, phone: true, language: true } },
+                        },
+                    },
+                },
+            },
+        },
+    });
+    if (!newRoom) return { error: 'Target room not found.' };
+
+    const volunteer = assignment.volunteer as unknown as {
+        id: string; name: string; phone: string | null; language: Language | null; type: VolunteerType;
+    };
+
+    if (!newRoom.house.acceptedTypes.includes(volunteer.type)) {
+        return { error: `${newRoom.house.name} does not accept ${volunteer.type.replace(/_/g, ' ').toLowerCase()}s.` };
+    }
+
+    const overlapping = await prisma.assignment.findMany({
+        where: {
+            roomId: newRoomId,
+            id: { not: assignmentId },
+            startDate: { lt: assignment.endDate },
+            endDate: { gt: assignment.startDate },
+        },
+        include: { volunteer: { select: { type: true } } },
+    });
+
+    const types = new Set(overlapping.map((a) => a.volunteer.type));
+    types.add(volunteer.type);
+    if (types.has('SINGLE_BROTHER') && types.has('SINGLE_SISTER')) {
+        return { error: 'Single brothers and single sisters cannot share the same room.' };
+    }
+
+    const allMarried =
+        volunteer.type === 'MARRIED_COUPLE' &&
+        overlapping.every((a) => a.volunteer.type === 'MARRIED_COUPLE');
+    const effectiveCapacity = allMarried ? Math.max(newRoom.capacity, 2) : newRoom.capacity;
+    if (overlapping.length >= effectiveCapacity) {
+        return { error: 'Target room is already at full capacity for those dates.' };
+    }
+
+    await prisma.assignment.update({
+        where: { id: assignmentId },
+        data: { roomId: newRoomId },
+    });
+
+    const oldRoom = assignment.room as unknown as {
+        name: string;
+        house: { name: string; owners: Array<{ volunteer: { name: string; phone: string | null; language: Language | null } }> };
+    };
+    const newRoomData = newRoom as unknown as {
+        name: string;
+        house: { name: string; address: string; owners: Array<{ volunteer: { name: string; phone: string | null; language: Language | null } }> };
+    };
+
+    sendRoomReassignmentNotification({
+        volunteerName: volunteer.name,
+        volunteerPhone: volunteer.phone,
+        volunteerLang: volunteer.language,
+        oldHouseName: oldRoom.house.name,
+        oldRoomName: oldRoom.name,
+        newHouseName: newRoomData.house.name,
+        newHouseAddress: newRoomData.house.address,
+        newRoomName: newRoomData.name,
+        startDate: assignment.startDate,
+        endDate: assignment.endDate,
+        oldHouseOwners: oldRoom.house.owners.map((o) => o.volunteer),
+        newHouseOwners: newRoomData.house.owners.map((o) => o.volunteer),
+    }).catch((err) => console.error('[reassignRoom] notification failed', err));
+
     revalidatePath('/planning');
     return { success: true };
 }
