@@ -447,11 +447,17 @@ export default function PlanningClient({
                             <label htmlFor="assign-room">{t.planning.room}</label>
                             <select id="assign-room" name="roomId" required>
                                 <option value="">{t.planning.selectRoom}</option>
-                                {allRooms.map((r) => (
-                                    <option key={r.id} value={r.id}>
-                                        {r.houseName} — {r.name} ({r.assignments.length}/{r.capacity})
-                                    </option>
-                                ))}
+                                {allRooms.map((r) => {
+                                    const allMarried =
+                                        r.assignments.length > 0 &&
+                                        r.assignments.every((a) => a.volunteer.type === 'MARRIED_COUPLE');
+                                    const effectiveCap = allMarried ? Math.max(r.capacity, 2) : r.capacity;
+                                    return (
+                                        <option key={r.id} value={r.id}>
+                                            {r.houseName} — {r.name} ({r.assignments.length}/{effectiveCap})
+                                        </option>
+                                    );
+                                })}
                             </select>
                         </div>
                     </div>

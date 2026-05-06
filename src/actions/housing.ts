@@ -282,7 +282,16 @@ export async function createAssignment(formData: FormData) {
         return { error: 'Single brothers and single sisters cannot share the same room.' };
     }
 
-    if (existingAssignments.length >= room.capacity) {
+    // A married couple may share a single-bed room: if every overlapping
+    // occupant (existing + incoming) is MARRIED_COUPLE, treat the room as
+    // having capacity ≥ 2 so a spouse can always be added to their partner's
+    // room. A third person — even if married — is still blocked.
+    const allMarried =
+        volunteer.type === 'MARRIED_COUPLE' &&
+        existingAssignments.every((a) => a.volunteer.type === 'MARRIED_COUPLE');
+    const effectiveCapacity = allMarried ? Math.max(room.capacity, 2) : room.capacity;
+
+    if (existingAssignments.length >= effectiveCapacity) {
         return { error: 'This room is already at full capacity for the selected dates.' };
     }
 
