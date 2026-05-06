@@ -106,14 +106,15 @@ export default function MonthSchedulePdfButton({ houses }: { houses: House[] }) 
             }
         }
 
-        // Sort by house, then room, then start date
+        // Sort by start date, then house, then room
         rows.sort((a, b) => {
+            const d = a.startDate.getTime() - b.startDate.getTime();
+            if (d !== 0) return d;
             const h = a.houseName.localeCompare(b.houseName);
             if (h !== 0) return h;
             const r = a.roomName.localeCompare(b.roomName);
             if (r !== 0) return r;
-            const d = a.startDate.getTime() - b.startDate.getTime();
-            return d !== 0 ? d : a.volunteerName.localeCompare(b.volunteerName);
+            return a.volunteerName.localeCompare(b.volunteerName);
         });
 
         // Build day-of-week header
@@ -128,7 +129,7 @@ export default function MonthSchedulePdfButton({ houses }: { houses: House[] }) 
         // Build rows
         let tableRows = '';
         if (rows.length === 0) {
-            tableRows = `<tr><td colspan="${totalDays + 3}" style="text-align:center;padding:20px;color:#9ca3af;font-style:italic;">No assignments this month</td></tr>`;
+            tableRows = `<tr><td colspan="${totalDays + 4}" style="text-align:center;padding:20px;color:#9ca3af;font-style:italic;">No assignments this month</td></tr>`;
         }
 
         for (const row of rows) {
@@ -156,13 +157,18 @@ export default function MonthSchedulePdfButton({ houses }: { houses: House[] }) 
                 return `<td class="day-cell${sun || sat ? ' weekend' : ''}"></td>`;
             }).join('');
 
+            const startDateStr = new Date(Date.UTC(row.startDate.getFullYear(), row.startDate.getMonth(), row.startDate.getDate())).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+            const endDateStr = new Date(Date.UTC(row.endDate.getFullYear(), row.endDate.getMonth(), row.endDate.getDate())).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+            const datesLabel = `${startDateStr} - ${endDateStr}`;
+
             tableRows += `
                 <tr>
                     <td class="name-cell">
                         <div style="margin-bottom:3px;"><span class="vol-name">${row.volunteerName}</span><span class="type-badge" style="background:${color}20;color:${color};border:1px solid ${color}40;">${label2}</span></div>
-                        ${row.hospitalityContact ? `<div style="font-size:9px;color:#6b7280;font-weight:500;">🤝 ${row.hospitalityContact}</div>` : ''}
                     </td>
+                    <td class="date-cell">${datesLabel}</td>
                     <td class="loc-cell">${row.houseName}<span class="room-name"> · ${row.roomName}</span></td>
+                    <td class="contact-cell">${row.hospitalityContact ? `🤝 ${row.hospitalityContact}` : '<span style="color:#9ca3af;">—</span>'}</td>
                     ${dayCells}
                 </tr>`;
         }
@@ -183,8 +189,10 @@ body { font-family: 'Inter', -apple-system, sans-serif; color: #1a1a2e; backgrou
 .header .meta { font-size: 10px; color: #9ca3af; text-align: right; }
 table { width: 100%; border-collapse: collapse; }
 th { background: #f1f5f9; padding: 6px 4px; font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: #475569; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
-th.name-hdr { text-align: left; min-width: 160px; padding-left: 8px; }
-th.loc-hdr { text-align: left; min-width: 120px; padding-left: 6px; }
+th.name-hdr { text-align: left; min-width: 130px; padding-left: 8px; }
+th.date-hdr { text-align: left; min-width: 80px; padding-left: 6px; }
+th.loc-hdr { text-align: left; min-width: 100px; padding-left: 6px; }
+th.contact-hdr { text-align: left; min-width: 90px; padding-left: 6px; }
 th.day-hdr { text-align: center; width: 22px; min-width: 18px; font-size: 9px; font-weight: 500; color: #94a3b8; line-height: 1.2; }
 th.day-hdr.weekend { color: #cbd5e1; }
 .wd { font-size: 8px; text-transform: uppercase; display: block; }
@@ -195,6 +203,8 @@ tr:hover td { background: #f0f9ff; }
 .type-badge { font-size: 9px; padding: 1px 5px; border-radius: 999px; font-weight: 500; white-space: nowrap; }
 .loc-cell { padding: 5px 6px; color: #374151; white-space: nowrap; font-size: 10px; }
 .room-name { color: #9ca3af; }
+.date-cell { padding: 5px 6px; color: #475569; white-space: nowrap; font-size: 10px; }
+.contact-cell { padding: 5px 6px; color: #374151; white-space: nowrap; font-size: 10px; font-weight: 500; }
 .day-cell { padding: 3px 1px; width: 22px; }
 .day-cell.weekend { background: #fafbff !important; }
 .bar { height: 14px; width: 100%; }
@@ -219,7 +229,9 @@ tr:hover td { background: #f0f9ff; }
     <thead>
         <tr>
             <th class="name-hdr">Volunteer</th>
+            <th class="date-hdr">Dates</th>
             <th class="loc-hdr">House · Room</th>
+            <th class="contact-hdr">Contact</th>
             ${dayHeaders}
         </tr>
     </thead>

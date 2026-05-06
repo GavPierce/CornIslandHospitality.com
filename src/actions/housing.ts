@@ -234,36 +234,42 @@ export async function deleteVolunteer(id: string) {
 
 // ─── Assignments ─────────────────────────────────────
 
-export async function createAssignment(formData: FormData) {
+export async function createAssignments(formData: FormData) {
     const authError = await requireElevatedAccess();
     if (authError) return { error: authError };
 
-    const volunteerId = formData.get('volunteerId') as string;
+    const volunteerIds = formData.getAll('volunteerIds') as string[];
     const roomId = formData.get('roomId') as string;
     const startDate = new Date(formData.get('startDate') as string);
     const endDate = new Date(formData.get('endDate') as string);
     const hospitalityMemberId = (formData.get('hospitalityMemberId') as string | null) || null;
 
-    if (!volunteerId || !roomId || isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-        return { error: 'All fields are required.' };
+    if (volunteerIds.length === 0 || !roomId || isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        return { error: 'All fields are required. Please select at least one volunteer.' };
     }
 
     if (endDate <= startDate) {
         return { error: 'End date must be after start date.' };
     }
 
-    const volunteer = await prisma.volunteer.findUnique({ where: { id: volunteerId } });
+    const volunteers = await prisma.volunteer.findMany({ where: { id: { in: volunteerIds } } });
+    if (volunteers.length !== volunteerIds.length) {
+        return { error: 'Some volunteers were not found.' };
+    }
+
     const room = await prisma.room.findUnique({
         where: { id: roomId },
         include: { house: true },
     });
 
-    if (!volunteer || !room) {
-        return { error: 'Volunteer or room not found.' };
+    if (!room) {
+        return { error: 'Room not found.' };
     }
 
-    if (!room.house.acceptedTypes.includes(volunteer.type)) {
-        return { error: `This house does not accept ${volunteer.type.replace('_', ' ').toLowerCase()}s.` };
+    for (const volunteer of volunteers) {
+        if (!room.house.acceptedTypes.includes(volunteer.type)) {
+            return { error: `This house does not accept ${volunteer.type.replace(/_/g, ' ').toLowerCase()}s (${volunteer.name}).` };
+        }
     }
 
     const existingAssignments = await prisma.assignment.findMany({
@@ -276,51 +282,55 @@ export async function createAssignment(formData: FormData) {
     });
 
     const conflictingTypes = new Set(existingAssignments.map((a) => a.volunteer.type));
-    conflictingTypes.add(volunteer.type);
+    for (const v of volunteers) {
+        conflictingTypes.add(v.type);
+    }
 
     if (conflictingTypes.has('SINGLE_BROTHER') && conflictingTypes.has('SINGLE_SISTER')) {
         return { error: 'Single brothers and single sisters cannot share the same room.' };
     }
 
-    // A married couple may share a single-bed room: if every overlapping
-    // occupant (existing + incoming) is MARRIED_COUPLE, treat the room as
-    // having capacity ≥ 2 so a spouse can always be added to their partner's
-    // room. A third person — even if married — is still blocked.
     const allMarried =
-        volunteer.type === 'MARRIED_COUPLE' &&
+        volunteers.every((v) => v.type === 'MARRIED_COUPLE') &&
         existingAssignments.every((a) => a.volunteer.type === 'MARRIED_COUPLE');
     const effectiveCapacity = allMarried ? Math.max(room.capacity, 2) : room.capacity;
 
-    if (existingAssignments.length >= effectiveCapacity) {
-        return { error: 'This room is already at full capacity for the selected dates.' };
+    if (existingAssignments.length + volunteers.length > effectiveCapacity) {
+        return { error: 'This room does not have enough capacity for the selected dates.' };
     }
 
-    const volunteerOverlap = await prisma.assignment.findFirst({
+    const volunteerOverlaps = await prisma.assignment.findMany({
         where: {
-            volunteerId,
+            volunteerId: { in: volunteerIds },
             startDate: { lt: endDate },
             endDate: { gt: startDate },
-        }
+        },
+        include: { volunteer: true },
     });
 
-    if (volunteerOverlap) {
-        return { error: 'This volunteer is already assigned to a room during the selected dates.' };
+    if (volunteerOverlaps.length > 0) {
+        const overlappedNames = Array.from(new Set(volunteerOverlaps.map(o => o.volunteer.name))).join(', ');
+        return { error: `The following volunteers are already assigned during the selected dates: ${overlappedNames}` };
     }
 
-    const newAssignment = await prisma.assignment.create({
-        data: {
-            volunteerId,
-            roomId,
-            startDate,
-            endDate,
-            ...(hospitalityMemberId ? { hospitalityMemberId } : {}),
-        },
-    });
+    const newAssignments = await prisma.$transaction(
+        volunteers.map(v => prisma.assignment.create({
+            data: {
+                volunteerId: v.id,
+                roomId,
+                startDate,
+                endDate,
+                ...(hospitalityMemberId ? { hospitalityMemberId } : {}),
+            }
+        }))
+    );
 
     // Fire-and-forget notifications
-    sendAssignmentConfirmation(newAssignment.id).catch((err) =>
-        console.error('[createAssignment] confirmation send failed', err)
-    );
+    for (const a of newAssignments) {
+        sendAssignmentConfirmation(a.id).catch((err) =>
+            console.error('[createAssignments] confirmation send failed', err)
+        );
+    }
 
     revalidatePath('/planning');
     return { success: true };

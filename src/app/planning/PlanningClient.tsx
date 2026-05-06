@@ -1,6 +1,6 @@
 'use client';
 
-import { createAssignment, deleteAssignment, createHouse, createRoom, deleteHouse, deleteRoom, addHouseOwner, removeHouseOwner, updateAssignmentHospitality, reassignRoom } from '@/actions/housing';
+import { createAssignments, deleteAssignment, createHouse, createRoom, deleteHouse, deleteRoom, addHouseOwner, removeHouseOwner, updateAssignmentHospitality, reassignRoom } from '@/actions/housing';
 import type { UserRole } from '@/lib/auth';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { useState } from 'react';
@@ -102,7 +102,7 @@ export default function PlanningClient({
     async function handleAssign(formData: FormData) {
         setError('');
         setSuccess('');
-        const result = await createAssignment(formData);
+        const result = await createAssignments(formData);
         if (result?.error) setError(result.error);
         else setSuccess(t.planning.assignmentSuccess);
     }
@@ -433,18 +433,20 @@ export default function PlanningClient({
                 <form action={handleAssign}>
                     <div className="form-row">
                         <div className="form-group">
-                            <label htmlFor="assign-volunteer">{t.planning.volunteer}</label>
-                            <select id="assign-volunteer" name="volunteerId" required>
-                                <option value="">{t.planning.selectVolunteer}</option>
-                                {volunteers.map((v) => (
-                                    <option key={v.id} value={v.id}>
-                                        {v.name} ({typeLabel(v.type)})
-                                    </option>
-                                ))}
-                                {volunteers.length === 0 && (
-                                    <option disabled>{t.planning.allVolunteersAssigned}</option>
+                            <label>{t.planning.volunteer}</label>
+                            <div className="checkbox-group" style={{ maxHeight: 200, overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '8px 12px' }}>
+                                {volunteers.length === 0 ? (
+                                    <span style={{ fontSize: '0.82rem', color: 'var(--text-tertiary)' }}>{t.planning.allVolunteersAssigned}</span>
+                                ) : (
+                                    volunteers.map((v) => (
+                                        <label key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            <input type="checkbox" name="volunteerIds" value={v.id} style={{ width: 16, height: 16 }} />
+                                            <span style={{ fontSize: '0.85rem' }}>{v.name}</span>
+                                            <span className={typeBadgeClass(v.type)} style={{ fontSize: '0.72rem' }}>{typeLabel(v.type)}</span>
+                                        </label>
+                                    ))
                                 )}
-                            </select>
+                            </div>
                         </div>
                         <div className="form-group">
                             <label htmlFor="assign-room">{t.planning.room}</label>
