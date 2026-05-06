@@ -5,6 +5,7 @@ import type { UserRole } from '@/lib/auth';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { useState } from 'react';
 import HousesPdfButton from '../HousesPdfButton';
+import MonthSchedulePdfButton from './MonthSchedulePdfButton';
 
 type Room = {
     id: string;
@@ -491,7 +492,10 @@ export default function PlanningClient({
 
             {/* ── Current Assignments by House ───────────────────────── */}
             <div className="section">
-                <h2 style={{ marginBottom: 16 }}>{t.planning.currentAssignments}</h2>
+                <div className="section-header" style={{ marginBottom: 16 }}>
+                    <h2>{t.planning.currentAssignments}</h2>
+                    <MonthSchedulePdfButton houses={houses} />
+                </div>
                 {houses.length === 0 ? (
                     <div className="glass-panel empty-state">
                         <div className="empty-icon">📋</div>
