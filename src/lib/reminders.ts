@@ -7,6 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import { adminPhoneSet, normalizePhone } from './phone';
 import { getRemindersEnabled } from './settings';
+import { schedule as cronSchedule } from 'node-cron';
 
 /**
  * Daily WhatsApp reminders.
@@ -1376,25 +1377,12 @@ export async function startReminderScheduler(): Promise<void> {
     const hour = Number(process.env.REMINDER_HOUR ?? '8');
     const tz = DEFAULT_TZ;
 
-    const cron = await import('node-cron');
-    const schedule = (cron as unknown as {
-        default?: {
-            schedule: (expr: string, fn: () => void, opts?: { timezone?: string }) => unknown;
-        };
-        schedule?: (expr: string, fn: () => void, opts?: { timezone?: string }) => unknown;
-    });
-    const scheduleFn = schedule.default?.schedule ?? schedule.schedule;
-    if (!scheduleFn) {
-        console.error('[reminders] node-cron.schedule not found; cron disabled.');
-        return;
-    }
-
     const expr = `0 ${hour} * * *`;
-    scheduleFn(
+    cronSchedule(
         expr,
         () => {
             runDailyReminders().catch((err) => {
-                console.error('[reminders] daily run failed', err);
+                waLog.error('[reminders] daily run failed', err);
             });
         },
         { timezone: tz },
@@ -1406,11 +1394,11 @@ export async function startReminderScheduler(): Promise<void> {
     // fires for shifts starting 45-75 min from now, with ReminderLog
     // idempotency preventing duplicate sends.
     const hourBeforeExpr = '*/15 * * * *';
-    scheduleFn(
+    cronSchedule(
         hourBeforeExpr,
         () => {
             runHourBeforeShiftReminders().catch((err) => {
-                console.error('[reminders] hour-before run failed', err);
+                waLog.error('[reminders] hour-before run failed', err);
             });
         },
         { timezone: tz },

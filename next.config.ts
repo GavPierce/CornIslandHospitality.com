@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
   // that Next's webpack/turbopack bundler can't trace correctly. Keeping
   // it "external" means Node resolves it from `node_modules` at runtime,
   // which is what the standalone build expects.
-  serverExternalPackages: ["@whiskeysockets/baileys", "qrcode"],
+  serverExternalPackages: ["@whiskeysockets/baileys", "qrcode", "node-cron"],
 };
 
 export default nextConfig;
