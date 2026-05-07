@@ -76,6 +76,7 @@ export default function PlanningClient({
     const [movePickerOpen, setMovePickerOpen] = useState<string | null>(null);
     const [movePickerValue, setMovePickerValue] = useState<Record<string, string>>({});
     const [volunteerSearch, setVolunteerSearch] = useState('');
+    const [selectedVolunteerIds, setSelectedVolunteerIds] = useState<Set<string>>(new Set());
 
     const hospitalityMembers = volunteers.filter((v) => v.isHospitality);
 
@@ -110,6 +111,7 @@ export default function PlanningClient({
             const form = document.getElementById('assignment-form') as HTMLFormElement;
             if (form) form.reset();
             setVolunteerSearch('');
+            setSelectedVolunteerIds(new Set());
         }
     }
 
@@ -454,12 +456,26 @@ export default function PlanningClient({
                                     <span style={{ fontSize: '0.82rem', color: 'var(--text-tertiary)' }}>{t.planning.allVolunteersAssigned}</span>
                                 ) : (
                                     volunteers.map((v) => {
+                                        const isSelected = selectedVolunteerIds.has(v.id);
                                         const matches = volunteerSearch.trim() === '' || 
+                                                        isSelected ||
                                                         v.name.toLowerCase().includes(volunteerSearch.toLowerCase()) || 
                                                         typeLabel(v.type).toLowerCase().includes(volunteerSearch.toLowerCase());
                                         return (
                                             <label key={v.id} style={{ display: matches ? 'flex' : 'none', alignItems: 'center', gap: 8 }}>
-                                                <input type="checkbox" name="volunteerIds" value={v.id} style={{ width: 16, height: 16 }} />
+                                                <input 
+                                                    type="checkbox" 
+                                                    name="volunteerIds" 
+                                                    value={v.id} 
+                                                    checked={isSelected}
+                                                    onChange={(e) => {
+                                                        const next = new Set(selectedVolunteerIds);
+                                                        if (e.target.checked) next.add(v.id);
+                                                        else next.delete(v.id);
+                                                        setSelectedVolunteerIds(next);
+                                                    }}
+                                                    style={{ width: 16, height: 16 }} 
+                                                />
                                                 <span style={{ fontSize: '0.85rem' }}>{v.name}</span>
                                                 <span className={typeBadgeClass(v.type)} style={{ fontSize: '0.72rem' }}>{typeLabel(v.type)}</span>
                                             </label>
