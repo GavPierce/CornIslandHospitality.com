@@ -71,11 +71,11 @@ export default function PlanningClient({
     // Per-house add-owner picker: houseId → selected volunteerId in the dropdown
     const [addOwnerOpen, setAddOwnerOpen] = useState<string | null>(null);
     const [addOwnerValue, setAddOwnerValue] = useState<Record<string, string>>({});
-    // Per-assignment hospitality picker: assignmentId → open state
     const [hospPickerOpen, setHospPickerOpen] = useState<string | null>(null);
     const [hospPickerValue, setHospPickerValue] = useState<Record<string, string>>({});
     const [movePickerOpen, setMovePickerOpen] = useState<string | null>(null);
     const [movePickerValue, setMovePickerValue] = useState<Record<string, string>>({});
+    const [volunteerSearch, setVolunteerSearch] = useState('');
 
     const hospitalityMembers = volunteers.filter((v) => v.isHospitality);
 
@@ -103,8 +103,14 @@ export default function PlanningClient({
         setError('');
         setSuccess('');
         const result = await createAssignments(formData);
-        if (result?.error) setError(result.error);
-        else setSuccess(t.planning.assignmentSuccess);
+        if (result?.error) {
+            setError(result.error);
+        } else {
+            setSuccess(t.planning.assignmentSuccess);
+            const form = document.getElementById('assignment-form') as HTMLFormElement;
+            if (form) form.reset();
+            setVolunteerSearch('');
+        }
     }
 
     async function handleCreateHouse(formData: FormData) {
@@ -430,15 +436,24 @@ export default function PlanningClient({
             {isAdmin && (
             <div className="glass-panel form-card">
                 <h3>{t.planning.newAssignment}</h3>
-                <form action={handleAssign}>
+                {error && <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div>}
+                {success && <div className="alert alert-success" style={{ marginBottom: 16 }}>{success}</div>}
+                <form action={handleAssign} id="assignment-form">
                     <div className="form-row">
                         <div className="form-group">
                             <label>{t.planning.volunteer}</label>
+                            <input
+                                type="text"
+                                placeholder="Search volunteers..."
+                                value={volunteerSearch}
+                                onChange={(e) => setVolunteerSearch(e.target.value)}
+                                style={{ marginBottom: 8, padding: '6px 10px', fontSize: '0.85rem', width: '100%', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}
+                            />
                             <div className="checkbox-group" style={{ maxHeight: 200, overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '8px 12px' }}>
                                 {volunteers.length === 0 ? (
                                     <span style={{ fontSize: '0.82rem', color: 'var(--text-tertiary)' }}>{t.planning.allVolunteersAssigned}</span>
                                 ) : (
-                                    volunteers.map((v) => (
+                                    volunteers.filter(v => v.name.toLowerCase().includes(volunteerSearch.toLowerCase()) || typeLabel(v.type).toLowerCase().includes(volunteerSearch.toLowerCase())).map((v) => (
                                         <label key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                             <input type="checkbox" name="volunteerIds" value={v.id} style={{ width: 16, height: 16 }} />
                                             <span style={{ fontSize: '0.85rem' }}>{v.name}</span>
