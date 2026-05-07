@@ -356,8 +356,15 @@ export function getWhatsAppStatus(): WhatsAppStatus {
  */
 export async function resetWhatsApp(): Promise<void> {
     if (holder.sock) {
+        // logout() can hang indefinitely if the socket is mid-handshake
+        // (state='connecting' but not yet authenticated) — race it
+        // against a short timeout so the admin "Unlink" button never
+        // blocks the HTTP response.
         try {
-            await holder.sock.logout();
+            await Promise.race([
+                holder.sock.logout(),
+                new Promise<void>((resolve) => setTimeout(resolve, 2500)),
+            ]);
         } catch {
             // ignore — we're tearing it down anyway
         }
@@ -371,11 +378,28 @@ export async function resetWhatsApp(): Promise<void> {
     holder.state = 'disconnected';
     holder.qr = null;
     holder.connectedAt = null;
+    // Critical: clear any in-flight startPromise. Without this, a
+    // subsequent ensureWhatsAppStarted() will await the old (possibly
+    // rejected or already-resolved) promise and silently no-op instead
+    // of spinning up a fresh socket — exactly what makes the "Unlink &
+    // re-pair" button appear to do nothing.
+    holder.startPromise = null;
     // Manual reset clears the anti-ban pause. Operator is asserting
     // they want a fresh session; let the queue start flowing again as
     // soon as we reconnect.
     holder.paused = false;
     holder.pauseReason = null;
+    // Wipe persisted credentials on disk so the next start cannot
+    // silently re-use the (now invalidated) session and skip the QR
+    // step. Without this, after a soft-reset Baileys often re-loads
+    // the cached creds and re-connects to the same restricted account.
+    try {
+        const { rmSync } = await import('fs');
+        rmSync(AUTH_DIR, { recursive: true, force: true });
+        waLog.info(`[whatsapp] Cleared auth dir at ${AUTH_DIR}`);
+    } catch (err) {
+        waLog.warn(`[whatsapp] Failed to clear auth dir: ${(err as Error).message}`);
+    }
 }
 
 // ── Queue worker ──────────────────────────────────────────────
