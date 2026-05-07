@@ -885,16 +885,19 @@ export async function sendAssignmentConfirmation(assignmentId: string): Promise<
         });
 
         // Send the FAQ/Map as a follow-up if the image is on disk.
-        // Pause first so the welcome text is visibly delivered before
-        // the image. Baileys' sendMessage resolves when the message is
-        // queued on the socket — not when WhatsApp's server accepts it
-        // — so without a delay the image's media-upload handshake
-        // sometimes finalizes before the text and arrives out of order.
+        // The global send queue (lib/whatsapp.ts) now handles ordering &
+        // throttling — including an extra randomized pause before media
+        // — so we no longer need a local pre-image setTimeout here.
+        //
+        // Set WA_SEND_FAQ_MAP=false in the environment to disable this
+        // image follow-up entirely (kill-switch in case WhatsApp flags
+        // the account again — image sends carry higher anti-spam risk
+        // than plain text on Baileys/non-business accounts).
+        const faqMapEnabled = process.env.WA_SEND_FAQ_MAP !== 'false';
         const authDir = process.env.WA_AUTH_DIR || path.join(process.cwd(), 'wa-auth');
         const mapImagePath = path.join(authDir, 'uploads', 'faq-map.jpg');
 
-        if (fs.existsSync(mapImagePath)) {
-            await new Promise((r) => setTimeout(r, 2500));
+        if (faqMapEnabled && fs.existsSync(mapImagePath)) {
             const faqText = await msgFaqMap({
                 volunteerName: volunteer.name,
                 houseName: house.name,

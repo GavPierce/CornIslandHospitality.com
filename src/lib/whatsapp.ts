@@ -56,6 +56,26 @@ type ConnectionUpdate = {
     lastDisconnect?: { error?: { message?: string; output?: { statusCode?: number } } };
 };
 
+// ── Send queue ────────────────────────────────────────────────
+// All outbound WhatsApp messages flow through a single FIFO queue so
+// large batches (e.g. assigning a 17-person group) cannot burst dozens
+// of messages through the socket in a few seconds. WhatsApp's anti-spam
+// flags exactly that pattern on non-business (Web/Baileys) accounts and
+// will restrict the account + unlink devices.
+//
+// The worker waits a randomized delay between sends (and an extra pause
+// before media). Delays are env-tunable; defaults are deliberately
+// conservative.
+type QueueJobKind = 'text' | 'image';
+type QueueJob = {
+    kind: QueueJobKind;
+    toPhone: string;
+    text: string;
+    imagePath?: string;
+    resolve: () => void;
+    reject: (err: Error) => void;
+};
+
 type SockHolder = {
     sock: BaileysSocket | null;
     state: ConnState;
@@ -69,6 +89,15 @@ type SockHolder = {
     // we have to hand back the original plaintext so it can re-encrypt
     // and resend with fresh ratchet keys.
     msgCache: Map<string, WAMessageContent>;
+    // Serialized send queue (see comment above).
+    queue: QueueJob[];
+    workerRunning: boolean;
+    lastSendAt: number; // epoch ms; 0 means "no prior send, skip inter-send delay"
+    // Anti-ban auto-pause. Set when WhatsApp closes the socket with a
+    // status code that suggests account restriction. While paused we
+    // refuse to send and skip auto-reconnect.
+    paused: boolean;
+    pauseReason: string | null;
 };
 
 const g = globalThis as unknown as { __cihWa?: SockHolder };
@@ -81,10 +110,37 @@ if (!g.__cihWa) {
         connectedAt: null,
         startPromise: null,
         msgCache: new Map(),
+        queue: [],
+        workerRunning: false,
+        lastSendAt: 0,
+        paused: false,
+        pauseReason: null,
     };
 }
 const holder = g.__cihWa;
 if (!holder.msgCache) holder.msgCache = new Map();
+if (!holder.queue) holder.queue = [];
+if (typeof holder.workerRunning !== 'boolean') holder.workerRunning = false;
+if (typeof holder.lastSendAt !== 'number') holder.lastSendAt = 0;
+if (typeof holder.paused !== 'boolean') holder.paused = false;
+if (holder.pauseReason === undefined) holder.pauseReason = null;
+
+// ── Throttle config (env-tunable) ─────────────────────────────
+function envInt(name: string, fallback: number): number {
+    const v = process.env[name];
+    if (!v) return fallback;
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+const WA_MIN_DELAY_MS = envInt('WA_MIN_DELAY_MS', 8000);
+const WA_MAX_DELAY_MS = envInt('WA_MAX_DELAY_MS', 15000);
+const WA_MEDIA_EXTRA_MIN_MS = envInt('WA_MEDIA_EXTRA_MIN_MS', 3000);
+const WA_MEDIA_EXTRA_MAX_MS = envInt('WA_MEDIA_EXTRA_MAX_MS', 5000);
+
+function randBetween(min: number, max: number): number {
+    if (max <= min) return min;
+    return Math.floor(min + Math.random() * (max - min));
+}
 
 const AUTH_DIR = process.env.WA_AUTH_DIR || join(process.cwd(), 'wa-auth');
 
@@ -194,26 +250,56 @@ async function startSocket(): Promise<void> {
             holder.lastError = null;
             holder.connectedAt = Date.now();
             waLog.info('[whatsapp] Connected.');
+            // Kick the queue worker in case jobs were enqueued while we
+            // were reconnecting.
+            if (!holder.workerRunning && holder.queue.length > 0) {
+                runQueueWorker().catch((err) => {
+                    waLog.error('[whatsapp.queue] worker crashed', err);
+                });
+            }
         } else if (u.connection === 'close') {
             const code = u.lastDisconnect?.error?.output?.statusCode;
             const message = u.lastDisconnect?.error?.message ?? null;
             const loggedOut = code === DisconnectReason.loggedOut;
+            // Suspicious close codes that often accompany account
+            // restrictions / bans on Baileys (Web) sessions. We refuse
+            // to auto-reconnect and refuse to keep sending so we don't
+            // dig the hole deeper. Admin must manually reset.
+            const SUSPICIOUS_CODES = new Set<number>([401, 403, 440]);
+            const suspicious =
+                loggedOut ||
+                (typeof code === 'number' && SUSPICIOUS_CODES.has(code));
             holder.sock = null;
             holder.state = 'disconnected';
             holder.lastError = message;
             holder.connectedAt = null;
             waLog.warn(`[whatsapp] Disconnected (code=${code}, loggedOut=${loggedOut}).`);
-            if (!loggedOut) {
+            if (suspicious) {
+                holder.paused = true;
+                holder.pauseReason =
+                    `Suspicious disconnect (code=${code}${loggedOut ? ', loggedOut' : ''}). ` +
+                    `Sending paused to avoid ban escalation. Manual reset required.`;
+                holder.qr = null;
+                waLog.error(
+                    `[whatsapp] PAUSED — ${holder.pauseReason} ` +
+                        `Drained queue size=${holder.queue.length}.`,
+                );
+                // Reject all pending queued jobs so callers stop awaiting.
+                const pending = holder.queue.splice(0, holder.queue.length);
+                for (const job of pending) {
+                    job.reject(
+                        new Error(
+                            `WhatsApp sending paused (suspicious disconnect, code=${code}).`,
+                        ),
+                    );
+                }
+            } else {
                 // Auto-reconnect after a short backoff.
                 setTimeout(() => {
                     ensureWhatsAppStarted().catch((err) => {
                         waLog.error('[whatsapp] Reconnect failed', err);
                     });
                 }, 3000);
-            } else {
-                // Session invalidated on the phone side. Drop the QR so
-                // the admin page will request a fresh one next start.
-                holder.qr = null;
             }
         }
     });
@@ -247,6 +333,9 @@ export type WhatsAppStatus = {
     qr: string | null;
     lastError: string | null;
     connectedAt: number | null;
+    paused: boolean;
+    pauseReason: string | null;
+    queueDepth: number;
 };
 
 export function getWhatsAppStatus(): WhatsAppStatus {
@@ -255,6 +344,9 @@ export function getWhatsAppStatus(): WhatsAppStatus {
         qr: holder.qr,
         lastError: holder.lastError,
         connectedAt: holder.connectedAt,
+        paused: holder.paused,
+        pauseReason: holder.pauseReason,
+        queueDepth: holder.queue.length,
     };
 }
 
@@ -279,14 +371,147 @@ export async function resetWhatsApp(): Promise<void> {
     holder.state = 'disconnected';
     holder.qr = null;
     holder.connectedAt = null;
+    // Manual reset clears the anti-ban pause. Operator is asserting
+    // they want a fresh session; let the queue start flowing again as
+    // soon as we reconnect.
+    holder.paused = false;
+    holder.pauseReason = null;
+}
+
+// ── Queue worker ──────────────────────────────────────────────
+// Single worker; processes one job at a time with conservative
+// randomized inter-send delays. Started lazily by enqueue().
+async function runQueueWorker(): Promise<void> {
+    if (holder.workerRunning) return;
+    holder.workerRunning = true;
+    try {
+        while (holder.queue.length > 0) {
+            if (holder.paused) {
+                const dropped = holder.queue.splice(0, holder.queue.length);
+                waLog.warn(
+                    `[whatsapp.queue] paused — dropping ${dropped.length} queued sends`,
+                );
+                for (const job of dropped) {
+                    job.reject(
+                        new Error(
+                            `WhatsApp sending paused: ${holder.pauseReason ?? 'unknown reason'}`,
+                        ),
+                    );
+                }
+                break;
+            }
+
+            // Ensure connection. ensureWhatsAppStarted resolves when the
+            // socket is created; wait briefly for state to leave
+            // 'connecting'.
+            await ensureWhatsAppStarted();
+            const MAX_WAIT_MS = 15_000;
+            let waited = 0;
+            while (holder.state === 'connecting' && waited < MAX_WAIT_MS) {
+                await new Promise((r) => setTimeout(r, 500));
+                waited += 500;
+            }
+            if (holder.state !== 'connected' || !holder.sock) {
+                // Reject only the head job; leave the rest queued so a
+                // later reconnect can drain them. (Callers already treat
+                // a rejection as "send failed".)
+                const job = holder.queue.shift()!;
+                job.reject(
+                    new Error(`WhatsApp not connected (state=${holder.state})`),
+                );
+                continue;
+            }
+
+            const job = holder.queue.shift()!;
+
+            // Inter-send delay: skip on the very first send (queue was
+            // idle) so OTPs etc. don't pay an 8–15s tax when nothing
+            // else is happening.
+            const now = Date.now();
+            if (holder.lastSendAt > 0) {
+                const sinceLast = now - holder.lastSendAt;
+                const baseDelay = randBetween(WA_MIN_DELAY_MS, WA_MAX_DELAY_MS);
+                const remaining = Math.max(0, baseDelay - sinceLast);
+                if (remaining > 0) {
+                    waLog.info(
+                        `[whatsapp.queue] sending after ${remaining}ms delay ` +
+                            `kind=${job.kind} queueDepth=${holder.queue.length}`,
+                    );
+                    await new Promise((r) => setTimeout(r, remaining));
+                }
+            }
+            // Extra pause before media — image sends are higher-risk.
+            if (job.kind === 'image') {
+                const extra = randBetween(
+                    WA_MEDIA_EXTRA_MIN_MS,
+                    WA_MEDIA_EXTRA_MAX_MS,
+                );
+                await new Promise((r) => setTimeout(r, extra));
+            }
+
+            // Re-check pause after the wait — a suspicious disconnect
+            // may have fired during the delay.
+            if (holder.paused) {
+                job.reject(
+                    new Error(
+                        `WhatsApp sending paused: ${holder.pauseReason ?? 'unknown reason'}`,
+                    ),
+                );
+                continue;
+            }
+
+            try {
+                if (job.kind === 'image' && job.imagePath) {
+                    await sendWhatsAppImageDirect(job.toPhone, job.imagePath, job.text);
+                } else {
+                    await sendWhatsAppTextDirect(job.toPhone, job.text);
+                }
+                holder.lastSendAt = Date.now();
+                job.resolve();
+            } catch (err) {
+                holder.lastSendAt = Date.now();
+                job.reject(err as Error);
+            }
+        }
+    } finally {
+        holder.workerRunning = false;
+    }
+}
+
+function enqueueSend(job: Omit<QueueJob, 'resolve' | 'reject'>): Promise<void> {
+    if (holder.paused) {
+        return Promise.reject(
+            new Error(
+                `WhatsApp sending paused: ${holder.pauseReason ?? 'unknown reason'}`,
+            ),
+        );
+    }
+    return new Promise<void>((resolve, reject) => {
+        holder.queue.push({ ...job, resolve, reject });
+        waLog.info(
+            `[whatsapp.queue] enqueued kind=${job.kind} to=${job.toPhone} ` +
+                `queueDepth=${holder.queue.length}`,
+        );
+        runQueueWorker().catch((err) => {
+            waLog.error('[whatsapp.queue] worker crashed', err);
+        });
+    });
 }
 
 /**
- * Low-level send. Dispatches arbitrary text to a phone via WhatsApp.
- * Throws if the socket isn't connected or the send fails — callers that
- * want a fallback (like the OTP flow) should wrap this in a try/catch.
+ * Public send: enqueues a text message on the global throttled queue.
+ * Resolves when the worker actually transmits, rejects on failure.
  */
 export async function sendWhatsAppText(toPhone: string, text: string): Promise<void> {
+    return enqueueSend({ kind: 'text', toPhone, text });
+}
+
+/**
+ * Low-level send (no queue). Dispatches arbitrary text to a phone via
+ * WhatsApp. Used by the queue worker. Throws if the socket isn't
+ * connected or the send fails.
+ */
+async function sendWhatsAppTextDirect(toPhone: string, text: string): Promise<void> {
     await ensureWhatsAppStarted();
     if (holder.state !== 'connected' || !holder.sock) {
         throw new Error(`WhatsApp not connected (state=${holder.state})`);
@@ -360,10 +585,22 @@ export async function sendWhatsAppOtp(toPhone: string, code: string): Promise<vo
 }
 
 /**
- * Send an image via WhatsApp with an optional caption.
+ * Public send: enqueues an image message on the global throttled queue.
  * Useful for maps, QR codes, or instructional graphics.
  */
 export async function sendWhatsAppImage(toPhone: string, imagePath: string, caption?: string): Promise<void> {
+    return enqueueSend({
+        kind: 'image',
+        toPhone,
+        text: caption ?? '',
+        imagePath,
+    });
+}
+
+/**
+ * Low-level image send (no queue). Used by the queue worker.
+ */
+async function sendWhatsAppImageDirect(toPhone: string, imagePath: string, caption?: string): Promise<void> {
     await ensureWhatsAppStarted();
     if (holder.state !== 'connected' || !holder.sock) {
         throw new Error(`WhatsApp not connected (state=${holder.state})`);
