@@ -74,6 +74,23 @@ export async function deleteHouse(id: string) {
     return { success: true };
 }
 
+export async function updateHouseAcceptedTypes(id: string, acceptedTypes: VolunteerType[]) {
+    const authError = await requireElevatedAccess();
+    if (authError) return { error: authError };
+
+    if (!id || !acceptedTypes || acceptedTypes.length === 0) {
+        return { error: 'House ID and at least one accepted type are required.' };
+    }
+
+    await prisma.house.update({
+        where: { id },
+        data: { acceptedTypes },
+    });
+
+    revalidatePath('/planning');
+    return { success: true };
+}
+
 export async function addHouseOwner(houseId: string, volunteerId: string) {
     const authError = await requireElevatedAccess();
     if (authError) return { error: authError };

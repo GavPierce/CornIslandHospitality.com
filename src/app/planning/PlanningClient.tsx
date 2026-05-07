@@ -1,6 +1,6 @@
 'use client';
 
-import { createAssignments, deleteAssignment, createHouse, createRoom, deleteHouse, deleteRoom, addHouseOwner, removeHouseOwner, updateAssignmentHospitality, reassignRoom } from '@/actions/housing';
+import { createAssignments, deleteAssignment, createHouse, createRoom, deleteHouse, deleteRoom, addHouseOwner, removeHouseOwner, updateAssignmentHospitality, reassignRoom, updateHouseAcceptedTypes } from '@/actions/housing';
 import type { UserRole } from '@/lib/auth';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { useState } from 'react';
@@ -77,6 +77,8 @@ export default function PlanningClient({
     const [movePickerValue, setMovePickerValue] = useState<Record<string, string>>({});
     const [volunteerSearch, setVolunteerSearch] = useState('');
     const [selectedVolunteerIds, setSelectedVolunteerIds] = useState<Set<string>>(new Set());
+    const [editTagsOpen, setEditTagsOpen] = useState<string | null>(null);
+    const [editTagsValue, setEditTagsValue] = useState<Record<string, string[]>>({});
 
     const hospitalityMembers = volunteers.filter((v) => v.isHospitality);
 
@@ -126,6 +128,17 @@ export default function PlanningClient({
         setError('');
         const result = await createRoom(formData);
         if (result?.error) setError(result.error);
+    }
+
+    async function handleUpdateTags(houseId: string) {
+        const types = editTagsValue[houseId];
+        if (!types || types.length === 0) {
+            setError('Please select at least one type.');
+            return;
+        }
+        const result = await updateHouseAcceptedTypes(houseId, types as any);
+        if (result?.error) setError(result.error);
+        else setEditTagsOpen(null);
     }
 
     return (
@@ -239,12 +252,50 @@ export default function PlanningClient({
                                         )}
                                     </div>
 
-                                    <div className="accepted-types">
-                                        {house.acceptedTypes.map((tp) => (
-                                            <span key={tp} className={typeBadgeClass(tp)}>
-                                                {typeLabel(tp)}
-                                            </span>
-                                        ))}
+                                    <div className="accepted-types" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                        {editTagsOpen === house.id ? (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: '4px 0' }}>
+                                                {['SINGLE_BROTHER', 'SINGLE_SISTER', 'MARRIED_COUPLE'].map((tp) => (
+                                                    <label key={tp} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.82rem', margin: 0, fontWeight: 'normal' }}>
+                                                        <input 
+                                                            type="checkbox" 
+                                                            checked={(editTagsValue[house.id] || house.acceptedTypes).includes(tp)}
+                                                            onChange={(e) => {
+                                                                const current = editTagsValue[house.id] || house.acceptedTypes;
+                                                                const next = e.target.checked 
+                                                                    ? [...current, tp] 
+                                                                    : current.filter(t => t !== tp);
+                                                                setEditTagsValue({ ...editTagsValue, [house.id]: next });
+                                                            }}
+                                                            style={{ margin: 0 }}
+                                                        />
+                                                        {typeLabel(tp)}
+                                                    </label>
+                                                ))}
+                                                <button className="btn btn-primary btn-sm" style={{ padding: '2px 8px', fontSize: '0.75rem' }} onClick={() => handleUpdateTags(house.id)}>Save</button>
+                                                <button className="btn btn-sm" style={{ padding: '2px 8px', fontSize: '0.75rem', border: '1px solid var(--border-color)' }} onClick={() => setEditTagsOpen(null)}>Cancel</button>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                {house.acceptedTypes.map((tp) => (
+                                                    <span key={tp} className={typeBadgeClass(tp)}>
+                                                        {typeLabel(tp)}
+                                                    </span>
+                                                ))}
+                                                {isAdmin && (
+                                                    <button 
+                                                        className="btn btn-sm" 
+                                                        style={{ padding: '2px 6px', fontSize: '0.75rem', border: '1px solid var(--border-color)', color: 'var(--text-tertiary)', background: 'none' }}
+                                                        onClick={() => {
+                                                            setEditTagsOpen(house.id);
+                                                            setEditTagsValue({ ...editTagsValue, [house.id]: house.acceptedTypes });
+                                                        }}
+                                                    >
+                                                        ✎ Edit
+                                                    </button>
+                                                )}
+                                            </>
+                                        )}
                                     </div>
 
                                     {/* ── Owners row ───────────────────── */}
