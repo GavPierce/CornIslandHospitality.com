@@ -453,13 +453,18 @@ export default function PlanningClient({
                                 {volunteers.length === 0 ? (
                                     <span style={{ fontSize: '0.82rem', color: 'var(--text-tertiary)' }}>{t.planning.allVolunteersAssigned}</span>
                                 ) : (
-                                    volunteers.filter(v => v.name.toLowerCase().includes(volunteerSearch.toLowerCase()) || typeLabel(v.type).toLowerCase().includes(volunteerSearch.toLowerCase())).map((v) => (
-                                        <label key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                            <input type="checkbox" name="volunteerIds" value={v.id} style={{ width: 16, height: 16 }} />
-                                            <span style={{ fontSize: '0.85rem' }}>{v.name}</span>
-                                            <span className={typeBadgeClass(v.type)} style={{ fontSize: '0.72rem' }}>{typeLabel(v.type)}</span>
-                                        </label>
-                                    ))
+                                    volunteers.map((v) => {
+                                        const matches = volunteerSearch.trim() === '' || 
+                                                        v.name.toLowerCase().includes(volunteerSearch.toLowerCase()) || 
+                                                        typeLabel(v.type).toLowerCase().includes(volunteerSearch.toLowerCase());
+                                        return (
+                                            <label key={v.id} style={{ display: matches ? 'flex' : 'none', alignItems: 'center', gap: 8 }}>
+                                                <input type="checkbox" name="volunteerIds" value={v.id} style={{ width: 16, height: 16 }} />
+                                                <span style={{ fontSize: '0.85rem' }}>{v.name}</span>
+                                                <span className={typeBadgeClass(v.type)} style={{ fontSize: '0.72rem' }}>{typeLabel(v.type)}</span>
+                                            </label>
+                                        );
+                                    })
                                 )}
                             </div>
                         </div>
