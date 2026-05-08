@@ -311,6 +311,17 @@ async function startSocket(): Promise<void> {
  */
 export async function ensureWhatsAppStarted(): Promise<void> {
     if (holder.sock || holder.state === 'connected') return;
+    // If sending is paused because of a suspicious disconnect, refuse
+    // to auto-start. Otherwise the 2s status-page poll creates an
+    // infinite reconnect → 401 → pause loop that spams the logs and
+    // hammers WhatsApp with the banned credentials. Manual reset is
+    // required to clear `paused` and proceed.
+    if (holder.paused) {
+        waLog.warn(
+            `[whatsapp] ensureWhatsAppStarted refused — paused: ${holder.pauseReason ?? 'unknown'}`,
+        );
+        return;
+    }
     if (holder.startPromise) {
         await holder.startPromise;
         return;
@@ -393,10 +404,30 @@ export async function resetWhatsApp(): Promise<void> {
     // silently re-use the (now invalidated) session and skip the QR
     // step. Without this, after a soft-reset Baileys often re-loads
     // the cached creds and re-connects to the same restricted account.
+    //
+    // Delete the CONTENTS of the auth dir rather than the dir itself —
+    // in Docker/Coolify deployments AUTH_DIR is typically a volume
+    // mount point owned by root, so `rmdir` on it fails with EACCES
+    // even though the files inside are writable by the app user.
     try {
-        const { rmSync } = await import('fs');
-        rmSync(AUTH_DIR, { recursive: true, force: true });
-        waLog.info(`[whatsapp] Cleared auth dir at ${AUTH_DIR}`);
+        const { readdirSync, rmSync } = await import('fs');
+        const { join: joinPath } = await import('path');
+        let entries: string[] = [];
+        try {
+            entries = readdirSync(AUTH_DIR);
+        } catch {
+            // dir doesn't exist yet — nothing to clear
+        }
+        for (const name of entries) {
+            try {
+                rmSync(joinPath(AUTH_DIR, name), { recursive: true, force: true });
+            } catch (err) {
+                waLog.warn(
+                    `[whatsapp] Could not remove ${name} from auth dir: ${(err as Error).message}`,
+                );
+            }
+        }
+        waLog.info(`[whatsapp] Cleared auth dir contents at ${AUTH_DIR} (${entries.length} entries).`);
     } catch (err) {
         waLog.warn(`[whatsapp] Failed to clear auth dir: ${(err as Error).message}`);
     }
