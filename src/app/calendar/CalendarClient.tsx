@@ -247,37 +247,25 @@ export default function CalendarClient({ houses }: { houses: House[] }) {
 
                         // Simple greedy track assignment: sort by start day, then
                         // place each in the first track that doesn't overlap
-                        const assignmentsWithTracks = assignmentsWithTrack
-                            .sort((a, b) => a.visStartDay - b.visStartDay)
-                            .map((a) => {
-                                const tracks: Array<{ start: number; end: number }> = [];
-                                let trackIndex = 0;
-                                for (const existing of assignmentsWithTracks) {
-                                    if (existing.id === a.id) continue;
-                                    const existingVisStart = existing.visStartDay;
-                                    const existingVisEnd = existing.visEndDay;
-                                    // Check if this existing assignment overlaps with current
-                                    if (a.visStartDay <= existingVisEnd && a.visEndDay >= existingVisStart) {
-                                        // They overlap, find which track it's in
-                                        const existingTrack = assignmentsWithTracks
-                                            .filter(x => x.id === existing.id)
-                                            .find(x => x.track !== undefined)?.track ?? 0;
-                                        if (!tracks[existingTrack]) {
-                                            tracks[existingTrack] = { start: existingVisStart, end: existingVisEnd };
-                                        }
-                                    }
+                        const sortedAssignments = [...assignmentsWithTrack].sort((a, b) => a.visStartDay - b.visStartDay);
+                        const assignmentsWithTracks: Array<typeof sortedAssignments[0] & { track?: number }> = [];
+
+                        for (const a of sortedAssignments) {
+                            let trackIndex = 0;
+                            while (true) {
+                                const hasOverlap = assignmentsWithTracks.some(existing => 
+                                    existing.track === trackIndex &&
+                                    a.visStartDay <= existing.visEndDay && 
+                                    a.visEndDay >= existing.visStartDay
+                                );
+                                
+                                if (!hasOverlap) {
+                                    break;
                                 }
-                                // Find first available track
-                                while (tracks[trackIndex]) {
-                                    const t = tracks[trackIndex];
-                                    if (a.visStartDay > t.end || a.visEndDay < t.start) {
-                                        // No overlap with this track's last assignment
-                                        break;
-                                    }
-                                    trackIndex++;
-                                }
-                                return { ...a, track: trackIndex };
-                            });
+                                trackIndex++;
+                            }
+                            assignmentsWithTracks.push({ ...a, track: trackIndex });
+                        }
 
                         const maxTracks = Math.max(...assignmentsWithTracks.map(a => a.track ?? 0), 0);
 
