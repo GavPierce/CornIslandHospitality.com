@@ -517,14 +517,21 @@ async function runQueueWorker(): Promise<void> {
 
             try {
                 if (job.kind === 'image' && job.imagePath) {
+                    waLog.info(
+                        `[whatsapp.queue] sending image to=${job.toPhone} queueDepth=${holder.queue.length}`,
+                    );
                     await sendWhatsAppImageDirect(job.toPhone, job.imagePath, job.text);
                 } else {
+                    waLog.info(
+                        `[whatsapp.queue] sending text to=${job.toPhone} queueDepth=${holder.queue.length}`,
+                    );
                     await sendWhatsAppTextDirect(job.toPhone, job.text);
                 }
                 holder.lastSendAt = Date.now();
                 job.resolve();
             } catch (err) {
                 holder.lastSendAt = Date.now();
+                waLog.error(`[whatsapp.queue] send failed to=${job.toPhone}`, err);
                 job.reject(err as Error);
             }
         }

@@ -897,6 +897,20 @@ export async function sendAssignmentConfirmation(assignmentId: string): Promise<
         const authDir = process.env.WA_AUTH_DIR || path.join(process.cwd(), 'wa-auth');
         const mapImagePath = path.join(authDir, 'uploads', 'faq-map.jpg');
 
+        if (faqMapEnabled) {
+            if (!fs.existsSync(mapImagePath)) {
+                waLog.warn(
+                    `[reminders] FAQ map image not found at ${mapImagePath} — skipping follow-up`,
+                );
+            } else {
+                waLog.info(
+                    `[reminders] Sending FAQ map follow-up to ${volunteer.phone} for assignment ${assignmentId}`,
+                );
+            }
+        } else {
+            waLog.info('[reminders] FAQ map follow-up disabled via WA_SEND_FAQ_MAP=false');
+        }
+
         if (faqMapEnabled && fs.existsSync(mapImagePath)) {
             const faqText = await msgFaqMap({
                 volunteerName: volunteer.name,
@@ -1373,6 +1387,7 @@ export async function runHourBeforeShiftReminders(
 ): Promise<{ sent: number; skipped: number; errors: number }> {
     const enabled = await getRemindersEnabled();
     if (!enabled) {
+        waLog.info('[reminders] hour-before sweep skipped — reminders disabled');
         return { sent: 0, skipped: 0, errors: 0 };
     }
 
@@ -1384,6 +1399,9 @@ export async function runHourBeforeShiftReminders(
         where: { date: { in: [today, tomorrow] } },
         include: { volunteer: true },
     });
+    waLog.info(
+        `[reminders] hour-before sweep: found ${candidates.length} shifts for ${dateKey(today)} and ${dateKey(tomorrow)}`,
+    );
 
     let sent = 0;
     let skipped = 0;

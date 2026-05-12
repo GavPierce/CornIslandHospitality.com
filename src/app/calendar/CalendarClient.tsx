@@ -231,13 +231,63 @@ export default function CalendarClient({ houses }: { houses: House[] }) {
                     {rooms.map((room) => {
                         const visibleAssignments = room.assignments.filter(overlapsMonth);
 
+                        // Calculate vertical stacking for overlapping assignments
+                        // Assign each bar a "track" index so they don't overlap visually
+                        const assignmentsWithTrack = visibleAssignments.map((a) => {
+                            const start = new Date(a.startDate);
+                            const end = new Date(a.endDate);
+                            const visStart = start < monthStart ? monthStart : start;
+                            const visEnd = end > monthEnd ? monthEnd : end;
+                            return {
+                                ...a,
+                                visStartDay: visStart.getDate(),
+                                visEndDay: visEnd.getDate(),
+                            };
+                        });
+
+                        // Simple greedy track assignment: sort by start day, then
+                        // place each in the first track that doesn't overlap
+                        const assignmentsWithTracks = assignmentsWithTrack
+                            .sort((a, b) => a.visStartDay - b.visStartDay)
+                            .map((a) => {
+                                const tracks: Array<{ start: number; end: number }> = [];
+                                let trackIndex = 0;
+                                for (const existing of assignmentsWithTracks) {
+                                    if (existing.id === a.id) continue;
+                                    const existingVisStart = existing.visStartDay;
+                                    const existingVisEnd = existing.visEndDay;
+                                    // Check if this existing assignment overlaps with current
+                                    if (a.visStartDay <= existingVisEnd && a.visEndDay >= existingVisStart) {
+                                        // They overlap, find which track it's in
+                                        const existingTrack = assignmentsWithTracks
+                                            .filter(x => x.id === existing.id)
+                                            .find(x => x.track !== undefined)?.track ?? 0;
+                                        if (!tracks[existingTrack]) {
+                                            tracks[existingTrack] = { start: existingVisStart, end: existingVisEnd };
+                                        }
+                                    }
+                                }
+                                // Find first available track
+                                while (tracks[trackIndex]) {
+                                    const t = tracks[trackIndex];
+                                    if (a.visStartDay > t.end || a.visEndDay < t.start) {
+                                        // No overlap with this track's last assignment
+                                        break;
+                                    }
+                                    trackIndex++;
+                                }
+                                return { ...a, track: trackIndex };
+                            });
+
+                        const maxTracks = Math.max(...assignmentsWithTracks.map(a => a.track ?? 0), 0);
+
                         return (
                             <div key={room.id} className="cal-row">
                                 <div className="cal-room-label">
                                     <div className="cal-room-name">{room.name}</div>
                                     <div className="cal-house-name">{room.houseName}</div>
                                 </div>
-                                <div className="cal-days-track">
+                                <div className="cal-days-track" style={{ minHeight: `${(maxTracks + 1) * 32}px` }}>
                                     {/* Grid lines */}
                                     {days.map((d) => {
                                         const date = new Date(currentYear, currentMonth, d);
@@ -254,8 +304,9 @@ export default function CalendarClient({ houses }: { houses: House[] }) {
                                     })}
 
                                     {/* Assignment bars */}
-                                    {visibleAssignments.map((a) => {
+                                    {assignmentsWithTracks.map((a) => {
                                         const barStyle = getBarStyle(a);
+                                        const trackOffset = (a.track ?? 0) * 32; // 32px per track
                                         return (
                                             <div
                                                 key={a.id}
@@ -264,6 +315,7 @@ export default function CalendarClient({ houses }: { houses: House[] }) {
                                                     ...barStyle,
                                                     backgroundColor: typeBgColor(a.volunteer.type),
                                                     borderLeft: `3px solid ${typeColor(a.volunteer.type)}`,
+                                                    top: `${trackOffset}px`,
                                                 }}
                                                 title={`${a.volunteer.name} (${new Date(a.startDate).toLocaleDateString(locale === 'es' ? 'es' : undefined)} – ${new Date(a.endDate).toLocaleDateString(locale === 'es' ? 'es' : undefined)})`}
                                             >
