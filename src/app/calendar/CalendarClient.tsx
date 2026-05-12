@@ -47,12 +47,16 @@ function getDaysInMonth(year: number, month: number): number {
     return new Date(year, month + 1, 0).getDate();
 }
 
+// Threshold: rooms with more tracks than this get collapsed by default
+const COLLAPSE_THRESHOLD = 4;
+
 export default function CalendarClient({ houses }: { houses: House[] }) {
     const { locale, t } = useTranslation();
     const today = new Date();
     const [currentMonth, setCurrentMonth] = useState(today.getMonth());
     const [currentYear, setCurrentYear] = useState(today.getFullYear());
     const [selectedHouseId, setSelectedHouseId] = useState<string>('all');
+    const [expandedRooms, setExpandedRooms] = useState<Set<string>>(new Set());
 
     const daysInMonth = getDaysInMonth(currentYear, currentMonth);
     const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
@@ -99,6 +103,18 @@ export default function CalendarClient({ houses }: { houses: House[] }) {
     function goToToday() {
         setCurrentMonth(today.getMonth());
         setCurrentYear(today.getFullYear());
+    }
+
+    function toggleRoom(roomId: string) {
+        setExpandedRooms(prev => {
+            const next = new Set(prev);
+            if (next.has(roomId)) {
+                next.delete(roomId);
+            } else {
+                next.add(roomId);
+            }
+            return next;
+        });
     }
 
     // Calculate left offset and width percentage for an assignment bar
@@ -232,7 +248,6 @@ export default function CalendarClient({ houses }: { houses: House[] }) {
                         const visibleAssignments = room.assignments.filter(overlapsMonth);
 
                         // Calculate vertical stacking for overlapping assignments
-                        // Assign each bar a "track" index so they don't overlap visually
                         const assignmentsWithTrack = visibleAssignments.map((a) => {
                             const start = new Date(a.startDate);
                             const end = new Date(a.endDate);
@@ -245,29 +260,51 @@ export default function CalendarClient({ houses }: { houses: House[] }) {
                             };
                         });
 
-                        // Simple greedy track assignment: sort by start day, then
-                        // place each in the first track that doesn't overlap
+                        // Greedy track assignment: sort by start, place in first non-overlapping track
                         const sortedAssignments = [...assignmentsWithTrack].sort((a, b) => a.visStartDay - b.visStartDay);
-                        const assignmentsWithTracks: Array<typeof sortedAssignments[0] & { track?: number }> = [];
+                        const assignmentsWithTracks: Array<typeof sortedAssignments[0] & { track: number }> = [];
 
                         for (const a of sortedAssignments) {
                             let trackIndex = 0;
                             while (true) {
-                                const hasOverlap = assignmentsWithTracks.some(existing => 
+                                const hasOverlap = assignmentsWithTracks.some(existing =>
                                     existing.track === trackIndex &&
-                                    a.visStartDay <= existing.visEndDay && 
+                                    a.visStartDay <= existing.visEndDay &&
                                     a.visEndDay >= existing.visStartDay
                                 );
-                                
-                                if (!hasOverlap) {
-                                    break;
-                                }
+                                if (!hasOverlap) break;
                                 trackIndex++;
                             }
                             assignmentsWithTracks.push({ ...a, track: trackIndex });
                         }
 
-                        const maxTracks = Math.max(...assignmentsWithTracks.map(a => a.track ?? 0), 0);
+                        const trackCount = assignmentsWithTracks.length > 0
+                            ? Math.max(...assignmentsWithTracks.map(a => a.track)) + 1
+                            : 1;
+
+                        const isCollapsible = trackCount > COLLAPSE_THRESHOLD;
+                        const isExpanded = expandedRooms.has(room.id);
+
+                        // Sizing: compact for expanded high-density rooms, normal otherwise
+                        const useCompact = isCollapsible && isExpanded;
+                        const trackPitch = useCompact ? 20 : 30;
+                        const barHeight = useCompact ? 16 : 26;
+                        const topPad = 7;
+
+                        // Which tracks to show
+                        const visibleTrackCount = isCollapsible && !isExpanded
+                            ? COLLAPSE_THRESHOLD
+                            : trackCount;
+                        const hiddenCount = trackCount - COLLAPSE_THRESHOLD;
+
+                        // Total height: visible tracks + padding + optional toggle bar
+                        const toggleBarHeight = isCollapsible ? 28 : 0;
+                        const trackHeight = visibleTrackCount * trackPitch + topPad * 2 + toggleBarHeight;
+
+                        // Filter bars to only visible tracks when collapsed
+                        const visibleBars = isCollapsible && !isExpanded
+                            ? assignmentsWithTracks.filter(a => a.track < COLLAPSE_THRESHOLD)
+                            : assignmentsWithTracks;
 
                         return (
                             <div key={room.id} className="cal-row">
@@ -275,42 +312,59 @@ export default function CalendarClient({ houses }: { houses: House[] }) {
                                     <div className="cal-room-name">{room.name}</div>
                                     <div className="cal-house-name">{room.houseName}</div>
                                 </div>
-                                <div className="cal-days-track" style={{ minHeight: `${(maxTracks + 1) * 32}px` }}>
-                                    {/* Grid lines */}
+                                <div className="cal-days-track" style={{ height: `${trackHeight}px` }}>
+                                    {/* Vertical grid lines (absolutely positioned) */}
                                     {days.map((d) => {
                                         const date = new Date(currentYear, currentMonth, d);
                                         const isWeekend = date.getDay() === 0 || date.getDay() === 6;
                                         const isToday = d === todayDay;
+                                        const leftPct = ((d - 1) / daysInMonth) * 100;
+                                        const widthPct = (1 / daysInMonth) * 100;
 
                                         return (
                                             <div
                                                 key={d}
                                                 className={`cal-day-cell ${isWeekend ? 'weekend' : ''} ${isToday ? 'today' : ''}`}
-                                                style={{ width: `${100 / daysInMonth}%` }}
+                                                style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
                                             />
                                         );
                                     })}
 
                                     {/* Assignment bars */}
-                                    {assignmentsWithTracks.map((a) => {
+                                    {visibleBars.map((a) => {
                                         const barStyle = getBarStyle(a);
-                                        const trackOffset = (a.track ?? 0) * 32; // 32px per track
+                                        const topOffset = topPad + a.track * trackPitch;
                                         return (
                                             <div
                                                 key={a.id}
-                                                className="cal-assignment-bar"
+                                                className={`cal-assignment-bar${useCompact ? ' compact' : ''}`}
                                                 style={{
                                                     ...barStyle,
+                                                    height: `${barHeight}px`,
                                                     backgroundColor: typeBgColor(a.volunteer.type),
                                                     borderLeft: `3px solid ${typeColor(a.volunteer.type)}`,
-                                                    top: `${trackOffset}px`,
+                                                    top: `${topOffset}px`,
                                                 }}
                                                 title={`${a.volunteer.name} (${new Date(a.startDate).toLocaleDateString(locale === 'es' ? 'es' : undefined)} – ${new Date(a.endDate).toLocaleDateString(locale === 'es' ? 'es' : undefined)})`}
                                             >
-                                                <span className="cal-bar-label">{a.volunteer.name}</span>
+                                                <span className={`cal-bar-label${useCompact ? ' compact' : ''}`}>{a.volunteer.name}</span>
                                             </div>
                                         );
                                     })}
+
+                                    {/* Collapse / Expand toggle */}
+                                    {isCollapsible && (
+                                        <button
+                                            className="cal-toggle-btn"
+                                            style={{ top: `${trackHeight - toggleBarHeight}px` }}
+                                            onClick={() => toggleRoom(room.id)}
+                                        >
+                                            {isExpanded
+                                                ? `▲ ${locale === 'es' ? 'Mostrar menos' : 'Show less'}`
+                                                : `▼ ${locale === 'es' ? `Mostrar +${hiddenCount} más` : `Show +${hiddenCount} more`}`
+                                            }
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         );
