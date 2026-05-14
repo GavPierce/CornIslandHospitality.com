@@ -303,8 +303,8 @@ export async function createAssignments(formData: FormData) {
         conflictingTypes.add(v.type);
     }
 
-    if (conflictingTypes.has('SINGLE_BROTHER') && conflictingTypes.has('SINGLE_SISTER')) {
-        return { error: 'Single brothers and single sisters cannot share the same room.' };
+    if (conflictingTypes.has('SINGLE_BROTHER') && conflictingTypes.has('SINGLE_SISTER') && !conflictingTypes.has('MARRIED_COUPLE')) {
+        return { error: 'Single brothers and single sisters cannot share the same room unless a married couple is present.' };
     }
 
     const allMarried =
@@ -484,8 +484,8 @@ export async function reassignRoom(
 
     const types = new Set(overlapping.map((a) => a.volunteer.type));
     types.add(volunteer.type);
-    if (types.has('SINGLE_BROTHER') && types.has('SINGLE_SISTER')) {
-        return { error: 'Single brothers and single sisters cannot share the same room.' };
+    if (types.has('SINGLE_BROTHER') && types.has('SINGLE_SISTER') && !types.has('MARRIED_COUPLE')) {
+        return { error: 'Single brothers and single sisters cannot share the same room unless a married couple is present.' };
     }
 
     const allMarried =
