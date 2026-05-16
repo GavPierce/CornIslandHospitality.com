@@ -175,13 +175,21 @@ export async function createVolunteer(formData: FormData) {
         || formData.get('isWatchman') === 'true';
     const isHospitality = formData.get('isHospitality') === 'on'
         || formData.get('isHospitality') === 'true';
+    const isLocal = formData.get('isLocal') === 'on'
+        || formData.get('isLocal') === 'true';
+
+    const arrivalRaw = (formData.get('arrivalDate') as string) || '';
+    const departureRaw = (formData.get('departureDate') as string) || '';
+    const arrivalDate = arrivalRaw ? new Date(arrivalRaw) : null;
+    const departureDate = departureRaw ? new Date(departureRaw) : null;
+    const groupName = ((formData.get('groupName') as string) || '').trim() || null;
 
     if (!name || !type) {
         return { error: 'Name and type are required.' };
     }
 
     await prisma.volunteer.create({
-        data: { name, email, phone, type, isWatchman, isHospitality },
+        data: { name, email, phone, type, isWatchman, isHospitality, isLocal, arrivalDate, departureDate, groupName },
     });
 
     revalidatePath('/volunteers');
@@ -208,6 +216,10 @@ export async function updateVolunteer(formData: FormData) {
     const isHospitality = formData.get('isHospitality') === 'on'
         || formData.get('isHospitality') === 'true';
 
+    const isLocalPresent = formData.get('isLocalPresent') != null;
+    const isLocal = formData.get('isLocal') === 'on'
+        || formData.get('isLocal') === 'true';
+
     const languageRaw = ((formData.get('language') as string) || '').trim();
     const languagePresent = formData.get('languagePresent') != null;
     const language: Language | null | undefined = languagePresent
@@ -215,6 +227,17 @@ export async function updateVolunteer(formData: FormData) {
             ? (languageRaw as Language)
             : null
         : undefined;
+
+    const arrivalPresent = formData.get('arrivalDatePresent') != null;
+    const arrivalRaw = ((formData.get('arrivalDate') as string) || '').trim();
+    const arrivalDate = arrivalPresent ? (arrivalRaw ? new Date(arrivalRaw) : null) : undefined;
+
+    const departurePresent = formData.get('departureDatePresent') != null;
+    const departureRaw = ((formData.get('departureDate') as string) || '').trim();
+    const departureDate = departurePresent ? (departureRaw ? new Date(departureRaw) : null) : undefined;
+
+    const groupPresent = formData.get('groupNamePresent') != null;
+    const groupName = groupPresent ? (((formData.get('groupName') as string) || '').trim() || null) : undefined;
 
     if (!id) return { error: 'Volunteer id is required.' };
     if (!name) return { error: 'Name is required.' };
@@ -228,7 +251,11 @@ export async function updateVolunteer(formData: FormData) {
             ...(type ? { type } : {}),
             ...(isWatchmanPresent ? { isWatchman } : {}),
             ...(isHospitalityPresent ? { isHospitality } : {}),
+            ...(isLocalPresent ? { isLocal } : {}),
             ...(languagePresent ? { language } : {}),
+            ...(arrivalPresent ? { arrivalDate } : {}),
+            ...(departurePresent ? { departureDate } : {}),
+            ...(groupPresent ? { groupName } : {}),
         },
     });
 

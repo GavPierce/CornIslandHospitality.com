@@ -58,6 +58,10 @@ model Volunteer {
   language               Language?     // preferred language for WhatsApp reminders
   isWatchman             Boolean       @default(false) // also stands night-watch shifts
   isHospitality          Boolean       @default(false) // member of the hospitality welcome team
+  isLocal                Boolean       @default(false) // local volunteers don't need rooming
+  arrivalDate            DateTime?     // expected arrival date (for non-locals needing rooming)
+  departureDate          DateTime?     // expected departure date (for non-locals needing rooming)
+  groupName              String?       // group label for organizing volunteers (e.g. "Team Alpha")
   assignments            Assignment[]  @relation("AssignmentVolunteer")
   hospitalityAssignments Assignment[]  @relation("HospitalityMember") // assignments where this volunteer is the hospitality contact
   shifts                 WatchmanShift[]

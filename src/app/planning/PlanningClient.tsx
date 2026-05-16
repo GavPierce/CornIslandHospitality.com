@@ -36,6 +36,8 @@ type Volunteer = {
     name: string;
     type: string;
     isHospitality: boolean;
+    isLocal: boolean;
+    groupName: string | null;
     assignments: { id: string; room: { name: string; house: { name: string } } }[];
 };
 
@@ -64,12 +66,14 @@ export default function PlanningClient({ houses, volunteers, role }: { houses: H
     const [movePickerValue, setMovePickerValue] = useState<Record<string, string>>({});
     const [volunteerSearch, setVolunteerSearch] = useState('');
     const [selectedVolunteerIds, setSelectedVolunteerIds] = useState<Set<string>>(new Set());
+    const [sidebarGroupFilter, setSidebarGroupFilter] = useState<string>('');
     const [editTagsOpen, setEditTagsOpen] = useState<string | null>(null);
     const [editTagsValue, setEditTagsValue] = useState<Record<string, string[]>>({});
 
     const hospitalityMembers = volunteers.filter((v) => v.isHospitality);
-    const unassignedVolunteers = volunteers.filter((v) => v.assignments.length === 0);
+    const unassignedCount = volunteers.filter((v) => v.assignments.length === 0).length;
     const allRooms = houses.flatMap((h) => h.rooms.map((r) => ({ ...r, houseName: h.name, houseAcceptedTypes: h.acceptedTypes })));
+    const sidebarGroupNames = Array.from(new Set(volunteers.map((v) => v.groupName).filter(Boolean) as string[])).sort();
 
     function typeLabel(type: string) {
         switch (type) {
@@ -122,7 +126,11 @@ export default function PlanningClient({ houses, volunteers, role }: { houses: H
         else setEditTagsOpen(null);
     }
 
-    const filteredUnassigned = unassignedVolunteers.filter((v) => {
+    const filteredVolunteers = volunteers.filter((v) => {
+        // Group filter
+        if (sidebarGroupFilter && v.groupName !== sidebarGroupFilter) {
+            if (!selectedVolunteerIds.has(v.id)) return false;
+        }
         if (volunteerSearch.trim() === '') return true;
         if (selectedVolunteerIds.has(v.id)) return true;
         const q = volunteerSearch.toLowerCase();
@@ -186,7 +194,7 @@ export default function PlanningClient({ houses, volunteers, role }: { houses: H
                     <div className="glass-panel plan-sidebar-panel">
                         <h3>
                             {t.planning.unassignedVolunteers}
-                            <span className="plan-count">{unassignedVolunteers.length}</span>
+                            <span className="plan-count">{unassignedCount} unassigned / {volunteers.length} total</span>
                         </h3>
                         <input
                             type="text"
@@ -195,18 +203,50 @@ export default function PlanningClient({ houses, volunteers, role }: { houses: H
                             onChange={(e) => setVolunteerSearch(e.target.value)}
                             style={{ padding: '8px 12px', fontSize: '0.85rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', width: '100%' }}
                         />
-                        {filteredUnassigned.length === 0 ? (
+                        {sidebarGroupNames.length > 0 && (
+                            <select
+                                value={sidebarGroupFilter}
+                                onChange={(e) => setSidebarGroupFilter(e.target.value)}
+                                style={{ padding: '6px 10px', fontSize: '0.82rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', width: '100%', marginTop: 6 }}
+                            >
+                                <option value="">All Groups</option>
+                                {sidebarGroupNames.map((g) => <option key={g} value={g}>{g}</option>)}
+                            </select>
+                        )}
+                        {filteredVolunteers.length === 0 ? (
                             <div style={{ fontSize: '0.82rem', color: 'var(--text-tertiary)', padding: '8px 0' }}>
-                                {unassignedVolunteers.length === 0 ? t.planning.allVolunteersAssigned : 'No matches'}
+                                {volunteers.length === 0 ? t.planning.allVolunteersAssigned : 'No matches'}
                             </div>
                         ) : (
                             <div className="plan-vol-list">
-                                {filteredUnassigned.map((v) => (
-                                    <button key={v.id} type="button" className={`plan-vol-chip ${selectedVolunteerIds.has(v.id) ? 'selected' : ''}`} onClick={() => toggleVol(v.id)}>
-                                        {v.name}
-                                        <span className={typeBadgeClass(v.type)}>{typeLabel(v.type)}</span>
-                                    </button>
-                                ))}
+                                {filteredVolunteers.map((v) => {
+                                    const currentAssignment = v.assignments.length > 0 ? v.assignments[0] : null;
+                                    return (
+                                        <button key={v.id} type="button" className={`plan-vol-chip ${selectedVolunteerIds.has(v.id) ? 'selected' : ''}`} onClick={() => toggleVol(v.id)}>
+                                            <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
+                                                <span>
+                                                    {v.name}
+                                                    {v.isLocal && (
+                                                        <span style={{ marginLeft: 6, padding: '1px 6px', fontSize: '0.65rem', background: 'rgba(245,158,11,0.15)', color: '#f59e0b', borderRadius: 999, fontWeight: 500 }}>
+                                                            🏠 Local
+                                                        </span>
+                                                    )}
+                                                </span>
+                                                {currentAssignment && (
+                                                    <span style={{ fontSize: '0.68rem', color: 'var(--text-tertiary)', fontWeight: 400 }}>
+                                                        📍 {currentAssignment.room.house.name} — {currentAssignment.room.name}
+                                                    </span>
+                                                )}
+                                                {v.groupName && (
+                                                    <span style={{ fontSize: '0.65rem', color: '#a78bfa', fontWeight: 400 }}>
+                                                        👥 {v.groupName}
+                                                    </span>
+                                                )}
+                                            </span>
+                                            <span className={typeBadgeClass(v.type)}>{typeLabel(v.type)}</span>
+                                        </button>
+                                    );
+                                })}
                             </div>
                         )}
 

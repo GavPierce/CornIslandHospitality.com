@@ -80,6 +80,18 @@ const es: Translations = {
     currentAssignment: 'Asignación Actual',
     unassigned: 'Sin asignar',
     delete: 'Eliminar',
+    isLocal: 'Es local (no necesita alojamiento)',
+    local: 'Local',
+    needsRooming: 'Necesita Alojamiento',
+    arrivalDate: 'Fecha de Llegada',
+    departureDate: 'Fecha de Salida',
+    group: 'Grupo',
+    groupPlaceholder: 'ej. Equipo Alfa',
+    allGroups: 'Todos los Grupos',
+    filterAll: 'Todos',
+    filterLocal: 'Locales',
+    filterNeedsRooming: 'Necesitan Alojamiento',
+    stayDates: 'Fechas de Estadía',
   },
 
   // Planning

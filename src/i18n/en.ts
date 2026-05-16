@@ -74,6 +74,18 @@ export type Translations = {
     currentAssignment: string;
     unassigned: string;
     delete: string;
+    isLocal: string;
+    local: string;
+    needsRooming: string;
+    arrivalDate: string;
+    departureDate: string;
+    group: string;
+    groupPlaceholder: string;
+    allGroups: string;
+    filterAll: string;
+    filterLocal: string;
+    filterNeedsRooming: string;
+    stayDates: string;
   };
   planning: {
     title: string;
@@ -259,6 +271,18 @@ const en: Translations = {
     currentAssignment: 'Current Assignment',
     unassigned: 'Unassigned',
     delete: 'Delete',
+    isLocal: 'Is local (no rooming needed)',
+    local: 'Local',
+    needsRooming: 'Needs Rooming',
+    arrivalDate: 'Arrival Date',
+    departureDate: 'Departure Date',
+    group: 'Group',
+    groupPlaceholder: 'e.g. Team Alpha',
+    allGroups: 'All Groups',
+    filterAll: 'All',
+    filterLocal: 'Local',
+    filterNeedsRooming: 'Needs Rooming',
+    stayDates: 'Stay Dates',
   },
   planning: {
     title: 'Planning',
