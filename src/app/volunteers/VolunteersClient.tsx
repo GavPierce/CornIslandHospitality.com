@@ -41,7 +41,7 @@ function typeBadgeClass(type: string) {
 function fmtDate(d: Date | string | null | undefined): string {
     if (!d) return '';
     const date = typeof d === 'string' ? new Date(d) : d;
-    return date.toLocaleDateString();
+    return date.toLocaleDateString(undefined, { timeZone: 'UTC' });
 }
 
 function toInputDate(d: Date | string | null | undefined): string {
@@ -66,6 +66,7 @@ export default function VolunteersClient({
     const [error, setError] = useState('');
     const [housingFilter, setHousingFilter] = useState<HousingFilter>('all');
     const [groupFilter, setGroupFilter] = useState<string>('');
+    const [searchQuery, setSearchQuery] = useState('');
     const [isLocalChecked, setIsLocalChecked] = useState(false);
 
     // Collect distinct group names for the filter dropdown and autocomplete datalist
@@ -100,13 +101,15 @@ export default function VolunteersClient({
 
     // Apply filters
     const filtered = useMemo(() => {
+        const q = searchQuery.trim().toLowerCase();
         return volunteers.filter((v) => {
             if (housingFilter === 'local' && !v.isLocal) return false;
             if (housingFilter === 'needs_rooming' && v.isLocal) return false;
             if (groupFilter && v.groupName !== groupFilter) return false;
+            if (q && !v.name.toLowerCase().includes(q) && !(v.email?.toLowerCase().includes(q)) && !(v.phone?.toLowerCase().includes(q)) && !(v.groupName?.toLowerCase().includes(q))) return false;
             return true;
         });
-    }, [volunteers, housingFilter, groupFilter]);
+    }, [volunteers, housingFilter, groupFilter, searchQuery]);
 
     const localCount = volunteers.filter((v) => v.isLocal).length;
     const needsRoomingCount = volunteers.length - localCount;
@@ -224,6 +227,14 @@ export default function VolunteersClient({
                             </button>
                         ))}
                     </div>
+                    {/* Search */}
+                    <input
+                        type="search"
+                        placeholder="Search by name, email, phone, group…"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        style={{ padding: '5px 10px', fontSize: '0.82rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', minWidth: 220 }}
+                    />
                     {/* Group filter dropdown */}
                     {groupNames.length > 0 && (
                         <select
@@ -375,123 +386,126 @@ function EditRow({
     t: ReturnType<typeof import('@/i18n/LanguageContext').useTranslation>['t'];
 }) {
     const [editLocal, setEditLocal] = useState(v.isLocal);
+    const fieldStyle: React.CSSProperties = {
+        width: '100%',
+        padding: '7px 10px',
+        fontSize: '0.85rem',
+        borderRadius: 'var(--radius-sm)',
+        border: '1px solid var(--border-color)',
+        background: 'var(--bg-primary)',
+        color: 'var(--text-primary)',
+    };
+    const labelStyle: React.CSSProperties = {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 4,
+        fontSize: '0.75rem',
+        fontWeight: 600,
+        textTransform: 'uppercase',
+        letterSpacing: '0.04em',
+        color: 'var(--text-tertiary)',
+    };
     return (
         <tr>
-            <td colSpan={isAdmin ? 7 : 6}>
-                <form
-                    action={handleUpdate}
-                    style={{
-                        display: 'grid',
-                        gap: 8,
-                        gridTemplateColumns: '1fr 1fr 1fr 1fr',
-                        alignItems: 'start',
-                    }}
-                >
+            <td colSpan={isAdmin ? 7 : 6} style={{ padding: '12px 8px' }}>
+                <form action={handleUpdate}>
                     <input type="hidden" name="id" value={v.id} />
-                    <input
-                        name="name"
-                        defaultValue={v.name}
-                        required
-                        placeholder="Name"
-                        className="form-input"
-                    />
-                    <select
-                        name="type"
-                        defaultValue={v.type}
-                        className="form-input"
-                    >
-                        <option value="SINGLE_BROTHER">{t.types.singleBrother}</option>
-                        <option value="SINGLE_SISTER">{t.types.singleSister}</option>
-                        <option value="MARRIED_COUPLE">{t.types.marriedCouple}</option>
-                    </select>
-                    <input
-                        name="phone"
-                        defaultValue={v.phone ?? ''}
-                        placeholder="+50588881111"
-                        type="tel"
-                        className="form-input"
-                    />
-                    <input
-                        name="email"
-                        defaultValue={v.email ?? ''}
-                        placeholder="email@example.com"
-                        type="email"
-                        className="form-input"
-                    />
-                    {/* Group */}
-                    <input type="hidden" name="groupNamePresent" value="1" />
-                    <input
-                        name="groupName"
-                        defaultValue={v.groupName ?? ''}
-                        placeholder={t.volunteers.groupPlaceholder}
-                        className="form-input"
-                        list="edit-group-names-list"
-                    />
-                    <datalist id="edit-group-names-list">
-                        {groupNames.map((g) => <option key={g} value={g} />)}
-                    </datalist>
-                    {/* Language override */}
-                    <input type="hidden" name="languagePresent" value="1" />
-                    <select
-                        name="language"
-                        defaultValue={v.language ?? ''}
-                        className="form-input"
-                        title="Preferred language for WhatsApp messages"
-                    >
-                        <option value="">🌐 Lang (not set)</option>
-                        <option value="EN">🇺🇸 English</option>
-                        <option value="ES">🇳🇮 Español</option>
-                    </select>
-                    {/* Is Local */}
-                    <input type="hidden" name="isLocalPresent" value="1" />
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                        <input type="checkbox" name="isLocal" checked={editLocal} onChange={(e) => setEditLocal(e.target.checked)} style={{ width: 18, height: 18, cursor: 'pointer' }} />
-                        <span>🏠 {t.volunteers.local}</span>
-                    </label>
-                    {/* Dates (shown only if not local) */}
-                    <input type="hidden" name="arrivalDatePresent" value="1" />
-                    <input type="hidden" name="departureDatePresent" value="1" />
-                    {!editLocal && (
-                        <>
-                            <input
-                                name="arrivalDate"
-                                type="date"
-                                defaultValue={toInputDate(v.arrivalDate)}
-                                className="form-input"
-                                title={t.volunteers.arrivalDate}
-                                placeholder={t.volunteers.arrivalDate}
-                            />
-                            <input
-                                name="departureDate"
-                                type="date"
-                                defaultValue={toInputDate(v.departureDate)}
-                                className="form-input"
-                                title={t.volunteers.departureDate}
-                                placeholder={t.volunteers.departureDate}
-                            />
-                        </>
-                    )}
-                    {/* Checkboxes */}
-                    <input type="hidden" name="isWatchmanPresent" value="1" />
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                        <input type="checkbox" name="isWatchman" defaultChecked={v.isWatchman} style={{ width: 18, height: 18, cursor: 'pointer' }} />
-                        <span>Watchman</span>
-                    </label>
-                    <input type="hidden" name="isHospitalityPresent" value="1" />
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                        <input type="checkbox" name="isHospitality" defaultChecked={v.isHospitality} style={{ width: 18, height: 18, cursor: 'pointer' }} />
-                        <span>🤝 Hospitality</span>
-                    </label>
-                    <button type="submit" className="btn btn-primary btn-sm">
-                        Save
-                    </button>
-                    <button
-                        type="button"
-                        className="btn btn-sm"
-                        onClick={onCancel}
-                    >
-                        Cancel
-                    </button>
+                    <div style={{
+                        background: 'var(--bg-secondary)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: 'var(--radius)',
+                        padding: '16px 20px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 14,
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>Editing: {v.name}</span>
+                            <button type="button" onClick={onCancel} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', color: 'var(--text-tertiary)' }}>✕</button>
+                        </div>
+
+                        {/* Row 1: Name + Type */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
+                            <label style={labelStyle}>
+                                {t.volunteers.fullName}
+                                <input name="name" defaultValue={v.name} required style={fieldStyle} />
+                            </label>
+                            <label style={labelStyle}>
+                                {t.volunteers.type}
+                                <select name="type" defaultValue={v.type} style={fieldStyle}>
+                                    <option value="SINGLE_BROTHER">{t.types.singleBrother}</option>
+                                    <option value="SINGLE_SISTER">{t.types.singleSister}</option>
+                                    <option value="MARRIED_COUPLE">{t.types.marriedCouple}</option>
+                                </select>
+                            </label>
+                        </div>
+
+                        {/* Row 2: Phone + Email + Group + Language */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12 }}>
+                            <label style={labelStyle}>
+                                {t.volunteers.phoneOptional}
+                                <input name="phone" defaultValue={v.phone ?? ''} placeholder="+50588881111" type="tel" style={fieldStyle} />
+                            </label>
+                            <label style={labelStyle}>
+                                {t.volunteers.emailOptional}
+                                <input name="email" defaultValue={v.email ?? ''} placeholder="email@example.com" type="email" style={fieldStyle} />
+                            </label>
+                            <label style={labelStyle}>
+                                {t.volunteers.group}
+                                <input type="hidden" name="groupNamePresent" value="1" />
+                                <input name="groupName" defaultValue={v.groupName ?? ''} placeholder={t.volunteers.groupPlaceholder} style={fieldStyle} list="edit-group-names-list" />
+                                <datalist id="edit-group-names-list">{groupNames.map((g) => <option key={g} value={g} />)}</datalist>
+                            </label>
+                            <label style={labelStyle}>
+                                Language
+                                <input type="hidden" name="languagePresent" value="1" />
+                                <select name="language" defaultValue={v.language ?? ''} style={fieldStyle}>
+                                    <option value="">🌐 Not set</option>
+                                    <option value="EN">🇺🇸 English</option>
+                                    <option value="ES">🇳🇮 Español</option>
+                                </select>
+                            </label>
+                        </div>
+
+                        {/* Row 3: Dates + Checkboxes */}
+                        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                            <input type="hidden" name="isLocalPresent" value="1" />
+                            <input type="hidden" name="arrivalDatePresent" value="1" />
+                            <input type="hidden" name="departureDatePresent" value="1" />
+                            <label style={{ ...labelStyle, flexDirection: 'row', alignItems: 'center', gap: 8, textTransform: 'none', letterSpacing: 0, fontSize: '0.85rem', cursor: 'pointer', fontWeight: 500, color: 'var(--text-secondary)' }}>
+                                <input type="checkbox" name="isLocal" checked={editLocal} onChange={(e) => setEditLocal(e.target.checked)} style={{ width: 16, height: 16 }} />
+                                🏠 {t.volunteers.local}
+                            </label>
+                            {!editLocal && (
+                                <>
+                                    <label style={labelStyle}>
+                                        {t.volunteers.arrivalDate}
+                                        <input name="arrivalDate" type="date" defaultValue={toInputDate(v.arrivalDate)} style={fieldStyle} />
+                                    </label>
+                                    <label style={labelStyle}>
+                                        {t.volunteers.departureDate}
+                                        <input name="departureDate" type="date" defaultValue={toInputDate(v.departureDate)} style={fieldStyle} />
+                                    </label>
+                                </>
+                            )}
+                            <input type="hidden" name="isWatchmanPresent" value="1" />
+                            <label style={{ ...labelStyle, flexDirection: 'row', alignItems: 'center', gap: 8, textTransform: 'none', letterSpacing: 0, fontSize: '0.85rem', cursor: 'pointer', fontWeight: 500, color: 'var(--text-secondary)' }}>
+                                <input type="checkbox" name="isWatchman" defaultChecked={v.isWatchman} style={{ width: 16, height: 16 }} />
+                                👁 Watchman
+                            </label>
+                            <input type="hidden" name="isHospitalityPresent" value="1" />
+                            <label style={{ ...labelStyle, flexDirection: 'row', alignItems: 'center', gap: 8, textTransform: 'none', letterSpacing: 0, fontSize: '0.85rem', cursor: 'pointer', fontWeight: 500, color: 'var(--text-secondary)' }}>
+                                <input type="checkbox" name="isHospitality" defaultChecked={v.isHospitality} style={{ width: 16, height: 16 }} />
+                                🤝 Hospitality
+                            </label>
+                        </div>
+
+                        {/* Actions */}
+                        <div style={{ display: 'flex', gap: 8, paddingTop: 4, borderTop: '1px solid var(--border-color)' }}>
+                            <button type="submit" className="btn btn-primary btn-sm">Save changes</button>
+                            <button type="button" className="btn btn-sm" onClick={onCancel} style={{ border: '1px solid var(--border-color)' }}>Cancel</button>
+                        </div>
+                    </div>
                 </form>
             </td>
         </tr>

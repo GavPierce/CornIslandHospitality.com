@@ -36,13 +36,13 @@ function toDateKey(d: Date | string | null | undefined): string {
 function fmtDateLong(d: Date | string | null | undefined): string {
     if (!d) return '';
     const date = typeof d === 'string' ? new Date(d) : d;
-    return date.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    return date.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
 }
 
 function fmtDate(d: Date | string | null | undefined): string {
     if (!d) return '';
     const date = typeof d === 'string' ? new Date(d) : d;
-    return date.toLocaleDateString();
+    return date.toLocaleDateString(undefined, { timeZone: 'UTC' });
 }
 
 function typeBadgeClass(type: string) {
