@@ -61,8 +61,8 @@ export default function CalendarClient({ houses }: { houses: House[] }) {
     const daysInMonth = getDaysInMonth(currentYear, currentMonth);
     const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
-    const monthStart = new Date(currentYear, currentMonth, 1);
-    const monthEnd = new Date(currentYear, currentMonth, daysInMonth, 23, 59, 59);
+    const monthStart = new Date(Date.UTC(currentYear, currentMonth, 1));
+    const monthEnd = new Date(Date.UTC(currentYear, currentMonth, daysInMonth, 23, 59, 59));
 
     // Format month/year using current locale
     function formatMonthYear(date: Date): string {
@@ -126,8 +126,8 @@ export default function CalendarClient({ houses }: { houses: House[] }) {
         const visStart = start < monthStart ? monthStart : start;
         const visEnd = end > monthEnd ? monthEnd : end;
 
-        const startDay = visStart.getDate();
-        const endDay = visEnd.getDate();
+        const startDay = visStart.getUTCDate();
+        const endDay = visEnd.getUTCDate();
 
         const leftPct = ((startDay - 1) / daysInMonth) * 100;
         const widthPct = ((endDay - startDay + 1) / daysInMonth) * 100;
@@ -255,8 +255,8 @@ export default function CalendarClient({ houses }: { houses: House[] }) {
                             const visEnd = end > monthEnd ? monthEnd : end;
                             return {
                                 ...a,
-                                visStartDay: visStart.getDate(),
-                                visEndDay: visEnd.getDate(),
+                                visStartDay: visStart.getUTCDate(),
+                                visEndDay: visEnd.getUTCDate(),
                             };
                         });
 
@@ -345,7 +345,7 @@ export default function CalendarClient({ houses }: { houses: House[] }) {
                                                     borderLeft: `3px solid ${typeColor(a.volunteer.type)}`,
                                                     top: `${topOffset}px`,
                                                 }}
-                                                title={`${a.volunteer.name} (${new Date(a.startDate).toLocaleDateString(locale === 'es' ? 'es' : undefined)} – ${new Date(a.endDate).toLocaleDateString(locale === 'es' ? 'es' : undefined)})`}
+                                                title={`${a.volunteer.name} (${new Date(a.startDate).toLocaleDateString(locale === 'es' ? 'es' : undefined, { timeZone: 'UTC' })} – ${new Date(a.endDate).toLocaleDateString(locale === 'es' ? 'es' : undefined, { timeZone: 'UTC' })})`}
                                             >
                                                 <span className={`cal-bar-label${useCompact ? ' compact' : ''}`}>{a.volunteer.name}</span>
                                             </div>

@@ -417,7 +417,7 @@ export default function PlanningClient({ houses, volunteers, role }: { houses: H
                                                                         <div className="plan-assignment-info">
                                                                             <span className="vol-name">{a.volunteer.name}</span>
                                                                             <span className={typeBadgeClass(a.volunteer.type)} style={{ fontSize: '0.68rem' }}>{typeLabel(a.volunteer.type)}</span>
-                                                                            <span className="date-range">{new Date(a.startDate).toLocaleDateString()} – {new Date(a.endDate).toLocaleDateString()}</span>
+                                                                            <span className="date-range">{new Date(a.startDate).toLocaleDateString(undefined, { timeZone: 'UTC' })} – {new Date(a.endDate).toLocaleDateString(undefined, { timeZone: 'UTC' })}</span>
                                                                             {a.hospitalityMember && (
                                                                                 <span className="plan-hosp-chip">🤝 {a.hospitalityMember.name}</span>
                                                                             )}

@@ -139,8 +139,8 @@ export default function MonthSchedulePdfButton({ houses }: { houses: House[] }) 
             const dayCells = Array.from({ length: totalDays }, (_, i) => {
                 const day = new Date(Date.UTC(year, month, i + 1));
                 // Normalize start/end to UTC midnight for day comparison
-                const start = new Date(Date.UTC(row.startDate.getFullYear(), row.startDate.getMonth(), row.startDate.getDate()));
-                const end = new Date(Date.UTC(row.endDate.getFullYear(), row.endDate.getMonth(), row.endDate.getDate()));
+                const start = new Date(Date.UTC(row.startDate.getUTCFullYear(), row.startDate.getUTCMonth(), row.startDate.getUTCDate()));
+                const end = new Date(Date.UTC(row.endDate.getUTCFullYear(), row.endDate.getUTCMonth(), row.endDate.getUTCDate()));
                 const isFirst = day.getTime() === start.getTime();
                 const isLast = day.getTime() === end.getTime();
                 const inRange = day >= start && day <= end;
@@ -157,8 +157,8 @@ export default function MonthSchedulePdfButton({ houses }: { houses: House[] }) 
                 return `<td class="day-cell${sun || sat ? ' weekend' : ''}"></td>`;
             }).join('');
 
-            const startDateStr = new Date(Date.UTC(row.startDate.getFullYear(), row.startDate.getMonth(), row.startDate.getDate())).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
-            const endDateStr = new Date(Date.UTC(row.endDate.getFullYear(), row.endDate.getMonth(), row.endDate.getDate())).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+            const startDateStr = new Date(Date.UTC(row.startDate.getUTCFullYear(), row.startDate.getUTCMonth(), row.startDate.getUTCDate())).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+            const endDateStr = new Date(Date.UTC(row.endDate.getUTCFullYear(), row.endDate.getUTCMonth(), row.endDate.getUTCDate())).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
             const datesLabel = `${startDateStr} - ${endDateStr}`;
 
             tableRows += `
