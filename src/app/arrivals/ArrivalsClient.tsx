@@ -73,6 +73,8 @@ export default function ArrivalsClient({
 }) {
     const todayStr = new Date().toISOString().slice(0, 10);
     const [selectedDate, setSelectedDate] = useState(todayStr);
+    const [calYear, setCalYear] = useState(() => new Date().getUTCFullYear());
+    const [calMonth, setCalMonth] = useState(() => new Date().getUTCMonth());
 
     // Find all volunteers arriving on the selected date
     const arriving = useMemo(() => {
@@ -106,43 +108,143 @@ export default function ArrivalsClient({
         return result;
     }, [arriving]);
 
+    const arrivalsByDate = useMemo(() => {
+        const map: Record<string, number> = {};
+        for (const v of volunteers) {
+            if (v.isLocal) continue;
+            const key = toDateKey(v.arrivalDate);
+            if (key) map[key] = (map[key] || 0) + 1;
+        }
+        return map;
+    }, [volunteers]);
+
+    const daysInMonth = new Date(Date.UTC(calYear, calMonth + 1, 0)).getUTCDate();
+    const firstDayOfWeek = new Date(Date.UTC(calYear, calMonth, 1)).getUTCDay();
+
+    function prevMonth() {
+        if (calMonth === 0) { setCalMonth(11); setCalYear((y) => y - 1); }
+        else setCalMonth((m) => m - 1);
+    }
+    function nextMonth() {
+        if (calMonth === 11) { setCalMonth(0); setCalYear((y) => y + 1); }
+        else setCalMonth((m) => m + 1);
+    }
+    function selectDate(dateStr: string) {
+        setSelectedDate(dateStr);
+        const d = new Date(dateStr + 'T00:00:00Z');
+        setCalYear(d.getUTCFullYear());
+        setCalMonth(d.getUTCMonth());
+    }
+
     const isToday = selectedDate === todayStr;
 
     return (
         <div className="animate-fade-in arrivals-page">
-            <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+            <div className="page-header">
                 <div>
                     <h1>🚢 Arrivals</h1>
-                    <p>Volunteers arriving {isToday ? 'today' : `on ${fmtDateLong(selectedDate)}`}</p>
+                    <p>Click any day to view arrivals and print the daily list.</p>
                 </div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            </div>
+
+            {/* ─── Calendar Overview (hidden when printing) ─── */}
+            <div className="glass-panel no-print" style={{ padding: '20px', marginBottom: 24 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                    <button onClick={prevMonth} style={{ background: 'none', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '6px 14px', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '1rem', lineHeight: 1 }}>←</button>
+                    <span style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--text-primary)' }}>
+                        {new Date(Date.UTC(calYear, calMonth, 1)).toLocaleDateString(undefined, { month: 'long', year: 'numeric', timeZone: 'UTC' })}
+                    </span>
+                    <button onClick={nextMonth} style={{ background: 'none', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '6px 14px', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '1rem', lineHeight: 1 }}>→</button>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginBottom: 4 }}>
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
+                        <div key={d} style={{ textAlign: 'center', fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-tertiary)', padding: '4px 0', letterSpacing: '0.03em' }}>{d}</div>
+                    ))}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3 }}>
+                    {Array.from({ length: firstDayOfWeek }).map((_, i) => <div key={`e${i}`} />)}
+                    {Array.from({ length: daysInMonth }, (_, i) => {
+                        const day = i + 1;
+                        const dateKey = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                        const count = arrivalsByDate[dateKey] || 0;
+                        const isSel = dateKey === selectedDate;
+                        const isTodayCal = dateKey === todayStr;
+                        return (
+                            <button
+                                key={day}
+                                onClick={() => selectDate(dateKey)}
+                                style={{
+                                    position: 'relative',
+                                    padding: '8px 4px 6px',
+                                    borderRadius: 'var(--radius-sm)',
+                                    border: isSel
+                                        ? '2px solid var(--accent)'
+                                        : isTodayCal
+                                        ? '1px solid rgba(99,102,241,0.45)'
+                                        : count > 0
+                                        ? '1px solid rgba(245,158,11,0.35)'
+                                        : '1px solid transparent',
+                                    background: isSel
+                                        ? 'rgba(99,102,241,0.15)'
+                                        : count > 0
+                                        ? 'rgba(245,158,11,0.08)'
+                                        : 'transparent',
+                                    cursor: 'pointer',
+                                    textAlign: 'center',
+                                    fontSize: '0.88rem',
+                                    fontWeight: isSel || isTodayCal ? 700 : 400,
+                                    color: isSel || isTodayCal ? 'var(--accent)' : 'var(--text-primary)',
+                                    minHeight: 44,
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'flex-start',
+                                    gap: 3,
+                                }}
+                            >
+                                {day}
+                                {count > 0 && (
+                                    <span style={{
+                                        background: isSel ? 'var(--accent)' : '#f59e0b',
+                                        color: '#fff',
+                                        borderRadius: 999,
+                                        fontSize: '0.65rem',
+                                        fontWeight: 700,
+                                        padding: '1px 5px',
+                                        lineHeight: 1.5,
+                                        minWidth: 18,
+                                        textAlign: 'center',
+                                    }}>{count}</span>
+                                )}
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* ─── Day Detail Header ─── */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--text-primary)' }}>
+                        {isToday ? 'Today — ' : ''}{fmtDateLong(selectedDate)}
+                    </span>
+                    {arriving.length > 0 && (
+                        <span style={{ padding: '2px 10px', background: 'rgba(245,158,11,0.15)', color: '#f59e0b', borderRadius: 999, fontSize: '0.82rem', fontWeight: 600 }}>
+                            {arriving.length} arriving
+                        </span>
+                    )}
+                </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }} className="no-print">
                     <input
                         type="date"
                         value={selectedDate}
-                        onChange={(e) => setSelectedDate(e.target.value)}
-                        style={{
-                            padding: '8px 12px',
-                            fontSize: '0.9rem',
-                            borderRadius: 'var(--radius-sm)',
-                            border: '1px solid var(--border-color)',
-                            background: 'var(--bg-primary)',
-                            color: 'var(--text-primary)',
-                        }}
+                        onChange={(e) => selectDate(e.target.value)}
+                        style={{ padding: '6px 10px', fontSize: '0.85rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
                     />
                     {!isToday && (
-                        <button
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => setSelectedDate(todayStr)}
-                        >
-                            Today
-                        </button>
+                        <button className="btn btn-secondary btn-sm" onClick={() => selectDate(todayStr)}>Today</button>
                     )}
-                    <button
-                        className="btn btn-primary btn-sm no-print"
-                        onClick={() => window.print()}
-                    >
-                        🖨️ Print
-                    </button>
+                    <button className="btn btn-primary btn-sm" onClick={() => window.print()}>🖨️ Print day</button>
                 </div>
             </div>
 
