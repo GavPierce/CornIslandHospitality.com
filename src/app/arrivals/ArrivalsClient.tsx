@@ -16,6 +16,7 @@ type VolunteerWithAssignments = {
     arrivalDate: Date | string | null;
     departureDate: Date | string | null;
     groupName: string | null;
+    arrivalTransport: string | null;
     assignments: {
         id: string;
         startDate: Date | string;
@@ -24,6 +25,7 @@ type VolunteerWithAssignments = {
             name: string;
             house: { name: string };
         };
+        hospitalityMember: { name: string; phone: string | null } | null;
     }[];
 };
 
@@ -166,36 +168,66 @@ export default function ArrivalsClient({
                     {/* Grouped list */}
                     {grouped.map((group, gi) => (
                         <div key={group.groupName ?? '__ungrouped'} className="arrivals-group" style={{ marginBottom: 24 }}>
-                            <div className="arrivals-group-header" style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 10,
-                                marginBottom: 12,
-                                paddingBottom: 8,
-                                borderBottom: '1px solid var(--border-color)',
-                            }}>
-                                {group.groupName ? (
-                                    <>
-                                        <span style={{
-                                            padding: '4px 12px',
-                                            fontSize: '0.85rem',
-                                            background: 'rgba(139,92,246,0.15)',
-                                            color: '#a78bfa',
-                                            borderRadius: 999,
-                                            fontWeight: 600,
-                                        }}>
-                                            👥 {group.groupName}
-                                        </span>
-                                        <span style={{ color: 'var(--text-tertiary)', fontSize: '0.82rem' }}>
-                                            {group.volunteers.length} volunteer{group.volunteers.length !== 1 ? 's' : ''}
-                                        </span>
-                                    </>
-                                ) : (
-                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', fontWeight: 600 }}>
-                                        Individuals (no group)
-                                    </span>
-                                )}
-                            </div>
+                            {(() => {
+                                // Collect unique hospitality contacts for this group
+                                const contactMap = new Map<string, { name: string; phone: string | null }>();
+                                for (const v of group.volunteers) {
+                                    for (const a of v.assignments) {
+                                        if (a.hospitalityMember) contactMap.set(a.hospitalityMember.name, a.hospitalityMember);
+                                    }
+                                }
+                                const contacts = Array.from(contactMap.values());
+                                return (
+                                    <div className="arrivals-group-header" style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 10,
+                                        marginBottom: 12,
+                                        paddingBottom: 8,
+                                        borderBottom: '1px solid var(--border-color)',
+                                        flexWrap: 'wrap',
+                                    }}>
+                                        {group.groupName ? (
+                                            <>
+                                                <span style={{
+                                                    padding: '4px 12px',
+                                                    fontSize: '0.85rem',
+                                                    background: 'rgba(139,92,246,0.15)',
+                                                    color: '#a78bfa',
+                                                    borderRadius: 999,
+                                                    fontWeight: 600,
+                                                }}>
+                                                    👥 {group.groupName}
+                                                </span>
+                                                <span style={{ color: 'var(--text-tertiary)', fontSize: '0.82rem' }}>
+                                                    {group.volunteers.length} volunteer{group.volunteers.length !== 1 ? 's' : ''}
+                                                </span>
+                                            </>
+                                        ) : (
+                                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', fontWeight: 600 }}>
+                                                Individuals (no group)
+                                            </span>
+                                        )}
+                                        {contacts.length > 0 && (
+                                            <span style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                                {contacts.map((c) => (
+                                                    <span key={c.name} style={{
+                                                        padding: '4px 12px',
+                                                        fontSize: '0.82rem',
+                                                        background: 'rgba(16,185,129,0.12)',
+                                                        color: '#34d399',
+                                                        borderRadius: 999,
+                                                        fontWeight: 500,
+                                                        border: '1px solid rgba(16,185,129,0.25)',
+                                                    }}>
+                                                        🤝 {c.name}{c.phone ? ` · ${c.phone}` : ''}
+                                                    </span>
+                                                ))}
+                                            </span>
+                                        )}
+                                    </div>
+                                );
+                            })()}
 
                             <div className="glass-panel data-table-wrapper">
                                 <table className="data-table">
@@ -221,6 +253,12 @@ export default function ArrivalsClient({
                                                 <tr key={v.id}>
                                                     <td style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
                                                         {v.name}
+                                                        {v.arrivalTransport === 'BOAT' && (
+                                                            <span style={{ marginLeft: 8, padding: '2px 8px', fontSize: '0.75rem', background: 'rgba(59,130,246,0.12)', color: '#60a5fa', borderRadius: 999, border: '1px solid rgba(59,130,246,0.25)' }}>⛴️ Boat</span>
+                                                        )}
+                                                        {v.arrivalTransport === 'PLANE' && (
+                                                            <span style={{ marginLeft: 8, padding: '2px 8px', fontSize: '0.75rem', background: 'rgba(139,92,246,0.12)', color: '#a78bfa', borderRadius: 999, border: '1px solid rgba(139,92,246,0.25)' }}>✈️ Plane</span>
+                                                        )}
                                                     </td>
                                                     <td>
                                                         <span className={typeBadgeClass(v.type)}>{typeLabel(v.type)}</span>

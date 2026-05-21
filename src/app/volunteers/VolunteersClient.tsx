@@ -18,6 +18,7 @@ type VolunteerWithAssignments = {
     arrivalDate: Date | string | null;
     departureDate: Date | string | null;
     groupName: string | null;
+    arrivalTransport: string | null;
     assignments: {
         id: string;
         startDate: Date;
@@ -50,7 +51,7 @@ function toInputDate(d: Date | string | null | undefined): string {
     return date.toISOString().slice(0, 10);
 }
 
-type HousingFilter = 'all' | 'needs_rooming' | 'local';
+type HousingFilter = 'needs_housing' | 'all' | 'needs_rooming' | 'local';
 
 export default function VolunteersClient({
     volunteers,
@@ -64,7 +65,7 @@ export default function VolunteersClient({
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [error, setError] = useState('');
-    const [housingFilter, setHousingFilter] = useState<HousingFilter>('all');
+    const [housingFilter, setHousingFilter] = useState<HousingFilter>('needs_housing');
     const [groupFilter, setGroupFilter] = useState<string>('');
     const [searchQuery, setSearchQuery] = useState('');
     const [isLocalChecked, setIsLocalChecked] = useState(false);
@@ -99,10 +100,32 @@ export default function VolunteersClient({
         else setEditingId(null);
     }
 
+    // Compute counts
+    const todayUTC = new Date();
+    todayUTC.setUTCHours(0, 0, 0, 0);
+
+    const localCount = useMemo(() => volunteers.filter((v) => v.isLocal).length, [volunteers]);
+    const needsRoomingCount = volunteers.length - localCount;
+    const needsHousingList = useMemo(() => volunteers.filter((v) => {
+        if (v.isLocal) return false;
+        if (v.assignments.length > 0) return false;
+        const dep = v.departureDate ? new Date(v.departureDate as string) : null;
+        const arr = v.arrivalDate ? new Date(v.arrivalDate as string) : null;
+        return (dep && dep >= todayUTC) || (arr && arr >= todayUTC);
+    }), [volunteers]);
+    const needsHousingCount = needsHousingList.length;
+
     // Apply filters
     const filtered = useMemo(() => {
         const q = searchQuery.trim().toLowerCase();
         return volunteers.filter((v) => {
+            if (housingFilter === 'needs_housing') {
+                if (v.isLocal) return false;
+                if (v.assignments.length > 0) return false;
+                const dep = v.departureDate ? new Date(v.departureDate as string) : null;
+                const arr = v.arrivalDate ? new Date(v.arrivalDate as string) : null;
+                if (!(dep && dep >= todayUTC) && !(arr && arr >= todayUTC)) return false;
+            }
             if (housingFilter === 'local' && !v.isLocal) return false;
             if (housingFilter === 'needs_rooming' && v.isLocal) return false;
             if (groupFilter && v.groupName !== groupFilter) return false;
@@ -110,9 +133,6 @@ export default function VolunteersClient({
             return true;
         });
     }, [volunteers, housingFilter, groupFilter, searchQuery]);
-
-    const localCount = volunteers.filter((v) => v.isLocal).length;
-    const needsRoomingCount = volunteers.length - localCount;
 
     return (
         <div className="animate-fade-in">
@@ -122,6 +142,27 @@ export default function VolunteersClient({
             </div>
 
             {error && <div className="alert alert-error">{error}</div>}
+
+            {/* Unhoused alert banner — visible on all tabs */}
+            {needsHousingCount > 0 && housingFilter !== 'needs_housing' && (
+                <div
+                    onClick={() => setHousingFilter('needs_housing')}
+                    style={{
+                        display: 'flex', alignItems: 'center', gap: 12,
+                        padding: '12px 18px', marginBottom: 16,
+                        background: 'rgba(245,158,11,0.1)',
+                        border: '1px solid rgba(245,158,11,0.4)',
+                        borderRadius: 'var(--radius)',
+                        cursor: 'pointer',
+                        color: '#f59e0b',
+                        fontWeight: 500,
+                        fontSize: '0.9rem',
+                    }}
+                >
+                    <span style={{ fontSize: '1.2rem' }}>⚠️</span>
+                    <span><strong>{needsHousingCount} volunteer{needsHousingCount !== 1 ? 's' : ''}</strong> {needsHousingCount !== 1 ? 'need' : 'needs'} housing assignment — <u>click to view</u></span>
+                </div>
+            )}
 
             <div className="section">
                 <div className="section-header">
@@ -178,16 +219,28 @@ export default function VolunteersClient({
                                 </div>
                             </div>
                             {!isLocalChecked && (
-                                <div className="form-row">
-                                    <div className="form-group">
-                                        <label htmlFor="vol-arrival">{t.volunteers.arrivalDate}</label>
-                                        <input id="vol-arrival" name="arrivalDate" type="date" />
+                                <>
+                                    <div className="form-row">
+                                        <div className="form-group">
+                                            <label htmlFor="vol-arrival">{t.volunteers.arrivalDate}</label>
+                                            <input id="vol-arrival" name="arrivalDate" type="date" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label htmlFor="vol-departure">{t.volunteers.departureDate}</label>
+                                            <input id="vol-departure" name="departureDate" type="date" />
+                                        </div>
                                     </div>
-                                    <div className="form-group">
-                                        <label htmlFor="vol-departure">{t.volunteers.departureDate}</label>
-                                        <input id="vol-departure" name="departureDate" type="date" />
+                                    <div className="form-row">
+                                        <div className="form-group">
+                                            <label htmlFor="vol-transport">Arriving by</label>
+                                            <select id="vol-transport" name="arrivalTransport">
+                                                <option value="">Not specified</option>
+                                                <option value="BOAT">⛴️ Boat</option>
+                                                <option value="PLANE">✈️ Plane</option>
+                                            </select>
+                                        </div>
                                     </div>
-                                </div>
+                                </>
                             )}
                             <div className="form-row">
                                 <div className="form-group">
@@ -211,7 +264,24 @@ export default function VolunteersClient({
                 {/* Filter Bar */}
                 <div className="glass-panel" style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', padding: '12px 16px', marginBottom: 0 }}>
                     {/* Housing filter pills */}
-                    <div style={{ display: 'flex', gap: 4 }}>
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                        {/* Needs Housing — special warning pill */}
+                        <button
+                            onClick={() => setHousingFilter('needs_housing')}
+                            style={{
+                                padding: '4px 12px', fontSize: '0.8rem', borderRadius: 999,
+                                border: 'none', cursor: 'pointer', fontWeight: 600,
+                                background: housingFilter === 'needs_housing'
+                                    ? (needsHousingCount > 0 ? '#f59e0b' : 'var(--accent)')
+                                    : (needsHousingCount > 0 ? 'rgba(245,158,11,0.15)' : 'var(--bg-secondary)'),
+                                color: housingFilter === 'needs_housing'
+                                    ? '#fff'
+                                    : (needsHousingCount > 0 ? '#f59e0b' : 'var(--text-secondary)'),
+                                outline: housingFilter === 'needs_housing' ? 'none' : (needsHousingCount > 0 ? '1px solid rgba(245,158,11,0.4)' : '1px solid var(--border-color)'),
+                            }}
+                        >
+                            {needsHousingCount > 0 ? '⚠️ ' : '✅ '}Needs Housing ({needsHousingCount})
+                        </button>
                         {([
                             { key: 'all' as HousingFilter, label: `${t.volunteers.filterAll} (${volunteers.length})` },
                             { key: 'needs_rooming' as HousingFilter, label: `${t.volunteers.filterNeedsRooming} (${needsRoomingCount})` },
@@ -252,9 +322,9 @@ export default function VolunteersClient({
 
                 {filtered.length === 0 ? (
                     <div className="glass-panel empty-state">
-                        <div className="empty-icon">👥</div>
-                        <h3>{t.volunteers.noVolunteers}</h3>
-                        <p>{t.volunteers.noVolunteersDesc}</p>
+                        <div className="empty-icon">{housingFilter === 'needs_housing' ? '🏡' : '👥'}</div>
+                        <h3>{housingFilter === 'needs_housing' ? 'All volunteers are housed!' : t.volunteers.noVolunteers}</h3>
+                        <p>{housingFilter === 'needs_housing' ? 'Every upcoming volunteer with a scheduled visit has a room assigned.' : t.volunteers.noVolunteersDesc}</p>
                     </div>
                 ) : (
                     <div className="glass-panel data-table-wrapper">
@@ -321,6 +391,7 @@ export default function VolunteersClient({
                                                     <span style={{ color: 'var(--text-tertiary)', fontSize: '0.82rem' }}>N/A</span>
                                                 ) : v.arrivalDate || v.departureDate ? (
                                                     <span style={{ fontSize: '0.82rem' }}>
+                                                        {v.arrivalTransport === 'BOAT' ? '⛴️ ' : v.arrivalTransport === 'PLANE' ? '✈️ ' : ''}
                                                         {fmtDate(v.arrivalDate)} – {fmtDate(v.departureDate)}
                                                     </span>
                                                 ) : (
@@ -485,6 +556,15 @@ function EditRow({
                                     <label style={labelStyle}>
                                         {t.volunteers.departureDate}
                                         <input name="departureDate" type="date" defaultValue={toInputDate(v.departureDate)} style={fieldStyle} />
+                                    </label>
+                                    <label style={labelStyle}>
+                                        Arriving by
+                                        <input type="hidden" name="arrivalTransportPresent" value="1" />
+                                        <select name="arrivalTransport" defaultValue={v.arrivalTransport ?? ''} style={fieldStyle}>
+                                            <option value="">Not specified</option>
+                                            <option value="BOAT">⛴️ Boat</option>
+                                            <option value="PLANE">✈️ Plane</option>
+                                        </select>
                                     </label>
                                 </>
                             )}

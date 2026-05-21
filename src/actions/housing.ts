@@ -2,7 +2,7 @@
 
 import { requireElevatedAccess } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { VolunteerType, Language } from '@prisma/client';
+import { VolunteerType, Language, ArrivalTransport } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 import { sendAssignmentConfirmation, sendHospitalityPairingNotification, sendHospitalityCancellationNotification, sendRoomReassignmentNotification } from '@/lib/reminders';
 
@@ -155,7 +155,7 @@ export async function getVolunteers() {
     return prisma.volunteer.findMany({
         include: {
             assignments: {
-                include: { room: { include: { house: true } } },
+                include: { room: { include: { house: true } }, hospitalityMember: { select: { name: true, phone: true } } },
                 where: { endDate: { gte: new Date() } },
             },
         },
@@ -183,13 +183,15 @@ export async function createVolunteer(formData: FormData) {
     const arrivalDate = arrivalRaw ? new Date(arrivalRaw) : null;
     const departureDate = departureRaw ? new Date(departureRaw) : null;
     const groupName = ((formData.get('groupName') as string) || '').trim() || null;
+    const transportRaw = ((formData.get('arrivalTransport') as string) || '').trim();
+    const arrivalTransport: ArrivalTransport | null = transportRaw === 'BOAT' || transportRaw === 'PLANE' ? (transportRaw as ArrivalTransport) : null;
 
     if (!name || !type) {
         return { error: 'Name and type are required.' };
     }
 
     await prisma.volunteer.create({
-        data: { name, email, phone, type, isWatchman, isHospitality, isLocal, arrivalDate, departureDate, groupName },
+        data: { name, email, phone, type, isWatchman, isHospitality, isLocal, arrivalDate, departureDate, groupName, arrivalTransport },
     });
 
     revalidatePath('/volunteers');
@@ -239,6 +241,12 @@ export async function updateVolunteer(formData: FormData) {
     const groupPresent = formData.get('groupNamePresent') != null;
     const groupName = groupPresent ? (((formData.get('groupName') as string) || '').trim() || null) : undefined;
 
+    const transportPresent = formData.get('arrivalTransportPresent') != null;
+    const transportRaw = ((formData.get('arrivalTransport') as string) || '').trim();
+    const arrivalTransport: ArrivalTransport | null | undefined = transportPresent
+        ? (transportRaw === 'BOAT' || transportRaw === 'PLANE' ? (transportRaw as ArrivalTransport) : null)
+        : undefined;
+
     if (!id) return { error: 'Volunteer id is required.' };
     if (!name) return { error: 'Name is required.' };
 
@@ -256,6 +264,7 @@ export async function updateVolunteer(formData: FormData) {
             ...(arrivalPresent ? { arrivalDate } : {}),
             ...(departurePresent ? { departureDate } : {}),
             ...(groupPresent ? { groupName } : {}),
+            ...(transportPresent ? { arrivalTransport } : {}),
         },
     });
 
