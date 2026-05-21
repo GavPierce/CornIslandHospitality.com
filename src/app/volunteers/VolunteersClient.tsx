@@ -132,6 +132,29 @@ export default function VolunteersClient({
         });
     }, [volunteers, housingFilter, groupFilter, searchQuery]);
 
+    const groupedVolunteers = useMemo(() => {
+        const groups: { [key: string]: VolunteerWithAssignments[] } = {};
+        filtered.forEach((v) => {
+            const gName = v.groupName || 'No Group';
+            if (!groups[gName]) {
+                groups[gName] = [];
+            }
+            groups[gName].push(v);
+        });
+
+        // Sort keys: named groups alphabetically, 'No Group' always at the end
+        return Object.keys(groups)
+            .sort((a, b) => {
+                if (a === 'No Group') return 1;
+                if (b === 'No Group') return -1;
+                return a.localeCompare(b);
+            })
+            .reduce((acc, key) => {
+                acc[key] = groups[key];
+                return acc;
+            }, {} as { [key: string]: VolunteerWithAssignments[] });
+    }, [filtered]);
+
     return (
         <div className="animate-fade-in">
             <div className="page-header">
@@ -324,112 +347,132 @@ export default function VolunteersClient({
                         <p>{housingFilter === 'needs_housing' ? 'Every upcoming volunteer with a scheduled visit has a room assigned.' : t.volunteers.noVolunteersDesc}</p>
                     </div>
                 ) : (
-                    <div className="glass-panel data-table-wrapper">
-                        <table className="data-table">
-                            <thead>
-                                <tr>
-                                    <th>{t.volunteers.nameCol}</th>
-                                    <th>{t.volunteers.typeCol}</th>
-                                    <th>{t.volunteers.group}</th>
-                                    <th>{t.volunteers.stayDates}</th>
-                                    <th>{t.volunteers.contactCol}</th>
-                                    <th>{t.volunteers.currentAssignment}</th>
-                                    {isAdmin && <th></th>}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filtered.map((v) => {
-                                    const currentAssignment = v.assignments[0];
-                                    if (editingId === v.id) {
-                                        return (
-                                            <EditRow
-                                                key={v.id}
-                                                v={v}
-                                                isAdmin={isAdmin}
-                                                groupNames={groupNames}
-                                                handleUpdate={handleUpdate}
-                                                onCancel={() => setEditingId(null)}
-                                                t={t}
-                                            />
-                                        );
-                                    }
-                                    return (
-                                        <tr key={v.id}>
-                                            <td style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
-                                                {v.name}
-                                                {v.isLocal && (
-                                                    <span style={{ marginLeft: 8, padding: '2px 8px', fontSize: '0.75rem', background: 'rgba(245,158,11,0.15)', color: '#f59e0b', borderRadius: 999, fontWeight: 500 }}>
-                                                        🏠 {t.volunteers.local}
-                                                    </span>
-                                                )}
-                                                {v.isWatchman && (
-                                                    <span style={{ marginLeft: 8, padding: '2px 8px', fontSize: '0.75rem', background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', borderRadius: 999, fontWeight: 500 }}>
-                                                        Watchman
-                                                    </span>
-                                                )}
-                                                {v.isHospitality && (
-                                                    <span style={{ marginLeft: 8, padding: '2px 8px', fontSize: '0.75rem', background: 'rgba(16,185,129,0.15)', color: '#34d399', borderRadius: 999, fontWeight: 500 }}>
-                                                        🤝 Hospitality
-                                                    </span>
-                                                )}
-                                            </td>
-                                            <td>
-                                                <span className={typeBadgeClass(v.type)}>{typeLabel(v.type)}</span>
-                                            </td>
-                                            <td>
-                                                {v.groupName ? (
-                                                    <span style={{ padding: '2px 8px', fontSize: '0.75rem', background: 'rgba(139,92,246,0.15)', color: '#a78bfa', borderRadius: 999, fontWeight: 500 }}>
-                                                        {v.groupName}
-                                                    </span>
-                                                ) : '—'}
-                                            </td>
-                                            <td>
-                                                {v.isLocal ? (
-                                                    <span style={{ color: 'var(--text-tertiary)', fontSize: '0.82rem' }}>N/A</span>
-                                                ) : v.arrivalDate || v.departureDate ? (
-                                                    <span style={{ fontSize: '0.82rem' }}>
-                                                        {v.arrivalTransport === 'BOAT' ? '⛴️ ' : v.arrivalTransport === 'PLANE' ? '✈️ ' : ''}
-                                                        {fmtDate(v.arrivalDate)} – {fmtDate(v.departureDate)}
-                                                    </span>
-                                                ) : (
-                                                    <span style={{ color: 'var(--warning)', fontSize: '0.82rem' }}>Not set</span>
-                                                )}
-                                            </td>
-                                            <td>
-                                                {v.email && <div>{v.email}</div>}
-                                                {v.phone && <div>{v.phone}</div>}
-                                                {!v.email && !v.phone && '—'}
-                                            </td>
-                                            <td>
-                                                {currentAssignment ? (
-                                                    <span>
-                                                        {currentAssignment.room.house.name} — {currentAssignment.room.name}
-                                                    </span>
-                                                ) : (
-                                                    <span style={{ color: 'var(--warning)' }}>{t.volunteers.unassigned}</span>
-                                                )}
-                                            </td>
-                                            {isAdmin && (
-                                                <td style={{ display: 'flex', gap: 8 }}>
-                                                    <button
-                                                        className="btn btn-secondary btn-sm"
-                                                        onClick={() => setEditingId(v.id)}
-                                                    >
-                                                        ✏️ Edit
-                                                    </button>
-                                                    <button
-                                                        className="btn btn-danger btn-sm"
-                                                        onClick={() => deleteVolunteer(v.id)}
-                                                    >
-                                                        {t.volunteers.delete}
-                                                    </button>
-                                                </td>
-                                            )}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                        {Object.entries(groupedVolunteers).map(([groupName, groupVols]) => (
+                            <div key={groupName} className="glass-panel data-table-wrapper" style={{ overflow: 'hidden' }}>
+                                <div style={{
+                                    padding: '14px 20px',
+                                    background: groupName === 'No Group' ? 'rgba(255, 255, 255, 0.02)' : 'rgba(139, 92, 246, 0.08)',
+                                    borderBottom: '1px solid var(--border-color)',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center'
+                                }}>
+                                    <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: groupName === 'No Group' ? 'var(--text-secondary)' : '#a78bfa', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <span>{groupName === 'No Group' ? '👤' : '👥'}</span>
+                                        <span>{groupName === 'No Group' ? t.volunteers.noGroup : `${t.volunteers.group}: ${groupName}`}</span>
+                                    </h3>
+                                    <span style={{ fontSize: '0.75rem', padding: '2px 8px', background: 'var(--bg-tertiary)', borderRadius: 999, color: 'var(--text-secondary)', fontWeight: 500 }}>
+                                        {groupVols.length} {groupVols.length !== 1 ? t.volunteers.volunteerPlural : t.volunteers.volunteer}
+                                    </span>
+                                </div>
+                                <table className="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>{t.volunteers.nameCol}</th>
+                                            <th>{t.volunteers.typeCol}</th>
+                                            <th>{t.volunteers.group}</th>
+                                            <th>{t.volunteers.stayDates}</th>
+                                            <th>{t.volunteers.contactCol}</th>
+                                            <th>{t.volunteers.currentAssignment}</th>
+                                            {isAdmin && <th></th>}
                                         </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
+                                    </thead>
+                                    <tbody>
+                                        {groupVols.map((v) => {
+                                            const currentAssignment = v.assignments[0];
+                                            if (editingId === v.id) {
+                                                return (
+                                                    <EditRow
+                                                        key={v.id}
+                                                        v={v}
+                                                        isAdmin={isAdmin}
+                                                        groupNames={groupNames}
+                                                        handleUpdate={handleUpdate}
+                                                        onCancel={() => setEditingId(null)}
+                                                        t={t}
+                                                    />
+                                                );
+                                            }
+                                            return (
+                                                <tr key={v.id}>
+                                                    <td style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
+                                                        {v.name}
+                                                        {v.isLocal && (
+                                                            <span style={{ marginLeft: 8, padding: '2px 8px', fontSize: '0.75rem', background: 'rgba(245,158,11,0.15)', color: '#f59e0b', borderRadius: 999, fontWeight: 500 }}>
+                                                                🏠 {t.volunteers.local}
+                                                            </span>
+                                                        )}
+                                                        {v.isWatchman && (
+                                                            <span style={{ marginLeft: 8, padding: '2px 8px', fontSize: '0.75rem', background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', borderRadius: 999, fontWeight: 500 }}>
+                                                                Watchman
+                                                            </span>
+                                                        )}
+                                                        {v.isHospitality && (
+                                                            <span style={{ marginLeft: 8, padding: '2px 8px', fontSize: '0.75rem', background: 'rgba(16,185,129,0.15)', color: '#34d399', borderRadius: 999, fontWeight: 500 }}>
+                                                                🤝 Hospitality
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td>
+                                                        <span className={typeBadgeClass(v.type)}>{typeLabel(v.type)}</span>
+                                                    </td>
+                                                    <td>
+                                                        {v.groupName ? (
+                                                            <span style={{ padding: '2px 8px', fontSize: '0.75rem', background: 'rgba(139,92,246,0.15)', color: '#a78bfa', borderRadius: 999, fontWeight: 500 }}>
+                                                                {v.groupName}
+                                                            </span>
+                                                        ) : '—'}
+                                                    </td>
+                                                    <td>
+                                                        {v.isLocal ? (
+                                                            <span style={{ color: 'var(--text-tertiary)', fontSize: '0.82rem' }}>N/A</span>
+                                                        ) : v.arrivalDate || v.departureDate ? (
+                                                            <span style={{ fontSize: '0.82rem' }}>
+                                                                {v.arrivalTransport === 'BOAT' ? '⛴️ ' : v.arrivalTransport === 'PLANE' ? '✈️ ' : ''}
+                                                                {fmtDate(v.arrivalDate)} – {fmtDate(v.departureDate)}
+                                                            </span>
+                                                        ) : (
+                                                            <span style={{ color: 'var(--warning)', fontSize: '0.82rem' }}>Not set</span>
+                                                        )}
+                                                    </td>
+                                                    <td>
+                                                        {v.email && <div>{v.email}</div>}
+                                                        {v.phone && <div>{v.phone}</div>}
+                                                        {!v.email && !v.phone && '—'}
+                                                    </td>
+                                                    <td>
+                                                        {currentAssignment ? (
+                                                            <span>
+                                                                {currentAssignment.room.house.name} — {currentAssignment.room.name}
+                                                            </span>
+                                                        ) : (
+                                                            <span style={{ color: 'var(--warning)' }}>{t.volunteers.unassigned}</span>
+                                                        )}
+                                                    </td>
+                                                    {isAdmin && (
+                                                        <td style={{ display: 'flex', gap: 8 }}>
+                                                            <button
+                                                                className="btn btn-secondary btn-sm"
+                                                                onClick={() => setEditingId(v.id)}
+                                                            >
+                                                                ✏️ Edit
+                                                            </button>
+                                                            <button
+                                                                className="btn btn-danger btn-sm"
+                                                                onClick={() => deleteVolunteer(v.id)}
+                                                            >
+                                                                {t.volunteers.delete}
+                                                            </button>
+                                                        </td>
+                                                    )}
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ))}
                     </div>
                 )}
             </div>

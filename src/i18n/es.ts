@@ -92,6 +92,7 @@ const es: Translations = {
     filterLocal: 'Locales',
     filterNeedsRooming: 'Necesitan Alojamiento',
     stayDates: 'Fechas de Estadía',
+    noGroup: 'Individuales / Sin Grupo',
   },
 
   // Planning

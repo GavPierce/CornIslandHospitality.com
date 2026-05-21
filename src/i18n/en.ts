@@ -86,6 +86,7 @@ export type Translations = {
     filterLocal: string;
     filterNeedsRooming: string;
     stayDates: string;
+    noGroup: string;
   };
   planning: {
     title: string;
@@ -283,6 +284,7 @@ const en: Translations = {
     filterLocal: 'Local',
     filterNeedsRooming: 'Needs Rooming',
     stayDates: 'Stay Dates',
+    noGroup: 'Individuals / No Group',
   },
   planning: {
     title: 'Planning',
