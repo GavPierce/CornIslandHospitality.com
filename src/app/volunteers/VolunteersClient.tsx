@@ -51,7 +51,7 @@ function toInputDate(d: Date | string | null | undefined): string {
     return date.toISOString().slice(0, 10);
 }
 
-type HousingFilter = 'needs_housing' | 'all' | 'needs_rooming' | 'local';
+type HousingFilter = 'needs_housing' | 'all' | 'local';
 
 export default function VolunteersClient({
     volunteers,
@@ -105,7 +105,6 @@ export default function VolunteersClient({
     todayUTC.setUTCHours(0, 0, 0, 0);
 
     const localCount = useMemo(() => volunteers.filter((v) => v.isLocal).length, [volunteers]);
-    const needsRoomingCount = volunteers.length - localCount;
     const needsHousingList = useMemo(() => volunteers.filter((v) => {
         if (v.isLocal) return false;
         if (v.assignments.length > 0) return false;
@@ -127,7 +126,6 @@ export default function VolunteersClient({
                 if (!(dep && dep >= todayUTC) && !(arr && arr >= todayUTC)) return false;
             }
             if (housingFilter === 'local' && !v.isLocal) return false;
-            if (housingFilter === 'needs_rooming' && v.isLocal) return false;
             if (groupFilter && v.groupName !== groupFilter) return false;
             if (q && !v.name.toLowerCase().includes(q) && !(v.email?.toLowerCase().includes(q)) && !(v.phone?.toLowerCase().includes(q)) && !(v.groupName?.toLowerCase().includes(q))) return false;
             return true;
@@ -284,7 +282,6 @@ export default function VolunteersClient({
                         </button>
                         {([
                             { key: 'all' as HousingFilter, label: `${t.volunteers.filterAll} (${volunteers.length})` },
-                            { key: 'needs_rooming' as HousingFilter, label: `${t.volunteers.filterNeedsRooming} (${needsRoomingCount})` },
                             { key: 'local' as HousingFilter, label: `🏠 ${t.volunteers.filterLocal} (${localCount})` },
                         ]).map(({ key, label }) => (
                             <button
