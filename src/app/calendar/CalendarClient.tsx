@@ -2,6 +2,8 @@
 
 import { useTranslation } from '@/i18n/LanguageContext';
 import { useState } from 'react';
+import CalendarPdfButton from './CalendarPdfButton';
+
 
 type Assignment = {
     id: string;
@@ -150,9 +152,18 @@ export default function CalendarClient({ houses }: { houses: House[] }) {
 
     return (
         <div className="animate-fade-in">
-            <div className="page-header">
-                <h1>{t.calendar.title}</h1>
-                <p>{t.calendar.subtitle}</p>
+            <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+                <div>
+                    <h1>{t.calendar.title}</h1>
+                    <p>{t.calendar.subtitle}</p>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <CalendarPdfButton
+                        houses={filteredHouses}
+                        year={currentYear}
+                        month={currentMonth}
+                    />
+                </div>
             </div>
 
             {/* Controls */}

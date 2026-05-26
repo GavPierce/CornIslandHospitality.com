@@ -4,6 +4,8 @@ import { createVolunteer, deleteVolunteer, updateVolunteer } from '@/actions/hou
 import type { UserRole } from '@/lib/auth';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { useState, useMemo } from 'react';
+import VolunteersPdfButton from './VolunteersPdfButton';
+
 
 type VolunteerWithAssignments = {
     id: string;
@@ -188,11 +190,19 @@ export default function VolunteersClient({
             <div className="section">
                 <div className="section-header">
                     <h2>{volunteers.length} {volunteers.length !== 1 ? t.volunteers.volunteerPlural : t.volunteers.volunteer}</h2>
-                    {isAdmin && (
-                        <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
-                            {showForm ? t.volunteers.cancel : t.volunteers.addVolunteer}
-                        </button>
-                    )}
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <VolunteersPdfButton
+                            volunteers={filtered}
+                            housingFilter={housingFilter}
+                            groupFilter={groupFilter}
+                            searchQuery={searchQuery}
+                        />
+                        {isAdmin && (
+                            <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
+                                {showForm ? t.volunteers.cancel : t.volunteers.addVolunteer}
+                            </button>
+                        )}
+                    </div>
                 </div>
 
                 {isAdmin && showForm && (
