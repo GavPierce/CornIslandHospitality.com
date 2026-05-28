@@ -1,9 +1,10 @@
 'use client';
 
-import { createAssignments, deleteAssignment, createHouse, createRoom, deleteHouse, deleteRoom, addHouseOwner, removeHouseOwner, updateAssignmentHospitality, reassignRoom, updateHouseAcceptedTypes } from '@/actions/housing';
+import { createAssignments, deleteAssignment, createHouse, createRoom, deleteHouse, deleteRoom, addHouseOwner, removeHouseOwner, updateAssignmentHospitality, reassignRoom, updateHouseAcceptedTypes, createHouseBlock, deleteHouseBlock } from '@/actions/housing';
 import type { UserRole } from '@/lib/auth';
 import { useTranslation } from '@/i18n/LanguageContext';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import HousesPdfButton from '../HousesPdfButton';
 import MonthSchedulePdfButton from './MonthSchedulePdfButton';
 
@@ -20,6 +21,14 @@ type Room = {
     }[];
 };
 
+type HouseBlock = {
+    id: string;
+    houseId: string;
+    startDate: Date | string;
+    endDate: Date | string;
+    reason: string | null;
+};
+
 type HouseOwnerEntry = { volunteer: { id: string; name: string; phone: string | null } };
 
 type House = {
@@ -29,6 +38,7 @@ type House = {
     acceptedTypes: string[];
     owners: HouseOwnerEntry[];
     rooms: Room[];
+    blocks: HouseBlock[];
 };
 
 type Volunteer = {
@@ -69,6 +79,22 @@ export default function PlanningClient({ houses, volunteers, role }: { houses: H
     const [sidebarGroupFilter, setSidebarGroupFilter] = useState<string>('');
     const [editTagsOpen, setEditTagsOpen] = useState<string | null>(null);
     const [editTagsValue, setEditTagsValue] = useState<Record<string, string[]>>({});
+    const [blockFormOpen, setBlockFormOpen] = useState<string | null>(null);
+
+    const searchParams = useSearchParams();
+    const groupParam = searchParams.get('group');
+    const initializedRef = useRef(false);
+
+    useEffect(() => {
+        if (groupParam && !initializedRef.current && volunteers.length > 0) {
+            initializedRef.current = true;
+            setSidebarGroupFilter(groupParam);
+            const groupVols = volunteers.filter(v => v.groupName === groupParam && v.assignments.length === 0);
+            if (groupVols.length > 0) {
+                setSelectedVolunteerIds(new Set(groupVols.map(v => v.id)));
+            }
+        }
+    }, [groupParam, volunteers]);
 
     const hospitalityMembers = volunteers.filter((v) => v.isHospitality);
     const unassignedCount = volunteers.filter((v) => v.assignments.length === 0).length;
@@ -109,6 +135,25 @@ export default function PlanningClient({ houses, volunteers, role }: { houses: H
         const result = await createHouse(formData);
         if (result?.error) setError(result.error);
         else setShowHouseForm(false);
+    }
+
+    async function handleCreateBlock(formData: FormData) {
+        setError(''); setSuccess('');
+        const result = await createHouseBlock(formData);
+        if (result?.error) { setError(result.error); }
+        else {
+            setBlockFormOpen(null);
+            setSuccess('House blocked successfully!');
+        }
+    }
+
+    async function handleDeleteBlock(id: string) {
+        setError(''); setSuccess('');
+        const result = await deleteHouseBlock(id);
+        if (result?.error) { setError(result.error); }
+        else {
+            setSuccess('Block removed successfully!');
+        }
     }
 
     async function handleCreateRoom(formData: FormData) {
@@ -364,8 +409,63 @@ export default function PlanningClient({ houses, volunteers, role }: { houses: H
                                                 </div>
                                             )}
                                             {isAdmin && editTagsOpen !== house.id && (
-                                                <div>
+                                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
                                                     <button className="plan-action-btn" onClick={() => { setEditTagsOpen(house.id); setEditTagsValue({ ...editTagsValue, [house.id]: house.acceptedTypes }); }}>✎ Edit types</button>
+                                                    <button className="plan-action-btn" onClick={() => setBlockFormOpen(blockFormOpen === house.id ? null : house.id)}>📅 {t.planning.blockDates}</button>
+                                                </div>
+                                            )}
+
+                                            {/* Block Dates Form */}
+                                            {isAdmin && blockFormOpen === house.id && (
+                                                <form action={handleCreateBlock} style={{ margin: '12px 0', padding: 14, background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
+                                                    <h4 style={{ margin: '0 0 10px 0', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>📅 {t.planning.blockDates}</h4>
+                                                    <input type="hidden" name="houseId" value={house.id} />
+                                                    <div className="form-row" style={{ display: 'flex', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
+                                                        <div className="form-group" style={{ flex: 1, minWidth: 120 }}>
+                                                            <label style={{ fontSize: '0.75rem', marginBottom: 4, display: 'block' }}>{t.planning.startDate}</label>
+                                                            <input type="date" name="startDate" required style={{ width: '100%', padding: '6px 10px', fontSize: '0.82rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }} />
+                                                        </div>
+                                                        <div className="form-group" style={{ flex: 1, minWidth: 120 }}>
+                                                            <label style={{ fontSize: '0.75rem', marginBottom: 4, display: 'block' }}>{t.planning.endDate}</label>
+                                                            <input type="date" name="endDate" required style={{ width: '100%', padding: '6px 10px', fontSize: '0.82rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }} />
+                                                        </div>
+                                                        <div className="form-group" style={{ flex: 2, minWidth: 180 }}>
+                                                            <label style={{ fontSize: '0.75rem', marginBottom: 4, display: 'block' }}>{t.planning.blockReason}</label>
+                                                            <input type="text" name="reason" placeholder="e.g. Maintenance, Paint job..." style={{ width: '100%', padding: '6px 10px', fontSize: '0.82rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }} />
+                                                        </div>
+                                                    </div>
+                                                    <div style={{ display: 'flex', gap: 8 }}>
+                                                        <button type="submit" className="btn btn-primary btn-sm" style={{ fontSize: '0.78rem', padding: '4px 12px' }}>{t.planning.addBlock}</button>
+                                                        <button type="button" className="btn btn-sm" onClick={() => setBlockFormOpen(null)} style={{ fontSize: '0.78rem', padding: '4px 12px', border: '1px solid var(--border-color)' }}>{t.volunteers.cancel}</button>
+                                                    </div>
+                                                </form>
+                                            )}
+
+                                            {/* Date Blocks list */}
+                                            {house.blocks && house.blocks.length > 0 && (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: '8px 0 12px 0', padding: '10px 14px', background: 'rgba(239, 68, 68, 0.05)', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(239, 68, 68, 0.15)' }}>
+                                                    <strong style={{ fontSize: '0.8rem', color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                        🛑 {t.planning.blockedDates}
+                                                    </strong>
+                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                                                        {house.blocks.map(b => {
+                                                            const start = new Date(b.startDate).toLocaleDateString(undefined, { timeZone: 'UTC' });
+                                                            const end = new Date(b.endDate).toLocaleDateString(undefined, { timeZone: 'UTC' });
+                                                            return (
+                                                                <div key={b.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'var(--bg-primary)', border: '1px solid var(--border-color)', padding: '4px 10px', borderRadius: 999, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                                                                    <span>
+                                                                        <strong>{start} — {end}</strong>
+                                                                        {b.reason && <span style={{ marginLeft: 6, color: 'var(--text-tertiary)' }}>({b.reason})</span>}
+                                                                    </span>
+                                                                    {isAdmin && (
+                                                                        <button type="button" onClick={() => handleDeleteBlock(b.id)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '0.85rem', padding: '0 4px', display: 'flex', alignItems: 'center' }} title={t.planning.deleteBlock}>
+                                                                            ✕
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
                                                 </div>
                                             )}
 

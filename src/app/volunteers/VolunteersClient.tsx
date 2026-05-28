@@ -4,6 +4,7 @@ import { createVolunteer, deleteVolunteer, updateVolunteer } from '@/actions/hou
 import type { UserRole } from '@/lib/auth';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import VolunteersPdfButton from './VolunteersPdfButton';
 
 
@@ -64,6 +65,7 @@ export default function VolunteersClient({
 }) {
     const isAdmin = role === 'admin' || role === 'hospitality';
     const { t } = useTranslation();
+    const router = useRouter();
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [error, setError] = useState('');
@@ -412,9 +414,20 @@ export default function VolunteersClient({
                                         <span>{groupName === 'No Group' ? '👤' : '👥'}</span>
                                         <span>{groupName === 'No Group' ? t.volunteers.noGroup : `${t.volunteers.group}: ${groupName}`}</span>
                                     </h3>
-                                    <span style={{ fontSize: '0.75rem', padding: '2px 8px', background: 'var(--bg-tertiary)', borderRadius: 999, color: 'var(--text-secondary)', fontWeight: 500 }}>
-                                        {groupVols.length} {groupVols.length !== 1 ? t.volunteers.volunteerPlural : t.volunteers.volunteer}
-                                    </span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                        <span style={{ fontSize: '0.75rem', padding: '2px 8px', background: 'var(--bg-tertiary)', borderRadius: 999, color: 'var(--text-secondary)', fontWeight: 500 }}>
+                                            {groupVols.length} {groupVols.length !== 1 ? t.volunteers.volunteerPlural : t.volunteers.volunteer}
+                                        </span>
+                                        {groupName !== 'No Group' && (
+                                            <button
+                                                className="btn btn-secondary btn-sm"
+                                                onClick={() => router.push(`/planning?group=${encodeURIComponent(groupName)}`)}
+                                                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px', fontSize: '0.75rem' }}
+                                            >
+                                                📅 {t.volunteers.bookGroup}
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                                 <table className="data-table">
                                     <thead>

@@ -93,6 +93,7 @@ const es: Translations = {
     filterNeedsRooming: 'Necesitan Alojamiento',
     stayDates: 'Fechas de Estadía',
     noGroup: 'Individuales / Sin Grupo',
+    bookGroup: 'Planificar Grupo',
   },
 
   // Planning
@@ -117,6 +118,11 @@ const es: Translations = {
     nameCol: 'Nombre',
     typeCol: 'Tipo',
     assignmentSuccess: '¡Asignación creada exitosamente!',
+    blockDates: 'Bloquear Fechas',
+    blockedDates: 'Fechas Bloqueadas',
+    blockReason: 'Motivo (opcional)',
+    addBlock: 'Bloquear Casa',
+    deleteBlock: 'Eliminar Bloqueo',
   },
 
   // Calendar

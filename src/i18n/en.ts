@@ -87,6 +87,7 @@ export type Translations = {
     filterNeedsRooming: string;
     stayDates: string;
     noGroup: string;
+    bookGroup: string;
   };
   planning: {
     title: string;
@@ -109,6 +110,11 @@ export type Translations = {
     nameCol: string;
     typeCol: string;
     assignmentSuccess: string;
+    blockDates: string;
+    blockedDates: string;
+    blockReason: string;
+    addBlock: string;
+    deleteBlock: string;
   };
   calendar: {
     title: string;
@@ -285,6 +291,7 @@ const en: Translations = {
     filterNeedsRooming: 'Needs Rooming',
     stayDates: 'Stay Dates',
     noGroup: 'Individuals / No Group',
+    bookGroup: 'Book Group',
   },
   planning: {
     title: 'Planning',
@@ -307,6 +314,11 @@ const en: Translations = {
     nameCol: 'Name',
     typeCol: 'Type',
     assignmentSuccess: 'Assignment created successfully!',
+    blockDates: 'Block Dates',
+    blockedDates: 'Blocked Dates',
+    blockReason: 'Reason (optional)',
+    addBlock: 'Block House',
+    deleteBlock: 'Remove Block',
   },
   calendar: {
     title: 'Calendar',

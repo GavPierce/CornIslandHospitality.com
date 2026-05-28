@@ -32,6 +32,9 @@ export async function getHouses() {
                     },
                 },
             },
+            blocks: {
+                orderBy: { startDate: 'asc' },
+            },
         },
         orderBy: { name: 'asc' },
     });
@@ -86,6 +89,66 @@ export async function updateHouseAcceptedTypes(id: string, acceptedTypes: Volunt
         where: { id },
         data: { acceptedTypes },
     });
+
+    revalidatePath('/planning');
+    return { success: true };
+}
+
+export async function createHouseBlock(formData: FormData) {
+    const authError = await requireElevatedAccess();
+    if (authError) return { error: authError };
+
+    const houseId = formData.get('houseId') as string;
+    const startDateStr = formData.get('startDate') as string;
+    const endDateStr = formData.get('endDate') as string;
+    const reason = (formData.get('reason') as string) || null;
+
+    if (!houseId || !startDateStr || !endDateStr) {
+        return { error: 'All fields are required.' };
+    }
+
+    const startDate = new Date(startDateStr);
+    const endDate = new Date(endDateStr);
+
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        return { error: 'Invalid dates.' };
+    }
+
+    if (endDate <= startDate) {
+        return { error: 'End date must be after start date.' };
+    }
+
+    const activeAssignments = await prisma.assignment.findFirst({
+        where: {
+            room: { houseId },
+            startDate: { lt: endDate },
+            endDate: { gt: startDate },
+        },
+        include: { volunteer: true },
+    });
+
+    if (activeAssignments) {
+        return { error: `Cannot block house: ${activeAssignments.volunteer.name} is already assigned during this period.` };
+    }
+
+    await prisma.houseBlock.create({
+        data: {
+            houseId,
+            startDate,
+            endDate,
+            reason,
+        },
+    });
+
+    revalidatePath('/planning');
+    return { success: true };
+}
+
+export async function deleteHouseBlock(id: string) {
+    const authError = await requireElevatedAccess();
+    if (authError) return { error: authError };
+
+    await prisma.houseBlock.delete({ where: { id } });
 
     revalidatePath('/planning');
     return { success: true };
@@ -317,6 +380,21 @@ export async function createAssignments(formData: FormData) {
 
     if (!room) {
         return { error: 'Room not found.' };
+    }
+
+    const activeBlock = await prisma.houseBlock.findFirst({
+        where: {
+            houseId: room.houseId,
+            startDate: { lt: endDate },
+            endDate: { gt: startDate },
+        },
+    });
+
+    if (activeBlock) {
+        const reasonStr = activeBlock.reason ? ` (${activeBlock.reason})` : '';
+        const startFmt = activeBlock.startDate.toLocaleDateString(undefined, { timeZone: 'UTC' });
+        const endFmt = activeBlock.endDate.toLocaleDateString(undefined, { timeZone: 'UTC' });
+        return { error: `Cannot assign volunteer: this house is blocked from ${startFmt} to ${endFmt}${reasonStr}.` };
     }
 
     for (const volunteer of volunteers) {
