@@ -16,12 +16,21 @@ type Room = {
     assignments: Assignment[];
 };
 
+type HouseBlock = {
+    id: string;
+    houseId: string;
+    startDate: Date | string;
+    endDate: Date | string;
+    reason: string | null;
+};
+
 type House = {
     id: string;
     name: string;
     address: string;
     acceptedTypes: string[];
     rooms: Room[];
+    blocks?: HouseBlock[];
 };
 
 interface CalendarPdfButtonProps {
@@ -77,6 +86,7 @@ export default function CalendarPdfButton({ houses, year, month }: CalendarPdfBu
             h.rooms.map((r) => ({
                 ...r,
                 houseName: h.name,
+                houseBlocks: h.blocks || [],
             }))
         );
 
@@ -187,6 +197,58 @@ export default function CalendarPdfButton({ houses, year, month }: CalendarPdfBu
                     </div>`;
             }).join('');
 
+            const overlapsBlockMonth = (b: HouseBlock) => {
+                const start = new Date(b.startDate);
+                const end = new Date(b.endDate);
+                return start <= monthEnd && end >= monthStart;
+            };
+
+            const blocksHtml = (room.houseBlocks || []).filter(overlapsBlockMonth).map((b) => {
+                const start = new Date(b.startDate);
+                const end = new Date(b.endDate);
+
+                const visStart = start < monthStart ? monthStart : start;
+                const visEnd = end > monthEnd ? monthEnd : end;
+
+                const startDay = visStart.getUTCDate();
+                const endDay = visEnd.getUTCDate();
+
+                const leftPct = ((startDay - 1) / totalDays) * 100;
+                const widthPct = ((endDay - startDay + 1) / totalDays) * 100;
+
+                const label = locale === 'es' ? 'BLOQUEADO' : 'BLOCKED';
+                const reasonStr = b.reason ? `: ${b.reason}` : '';
+
+                return `
+                    <div class="house-block-bar" style="
+                        position: absolute;
+                        left: ${leftPct}%;
+                        width: ${Math.max(widthPct, (1 / totalDays) * 100)}%;
+                        top: 0;
+                        bottom: 0;
+                        background-color: rgba(239, 68, 68, 0.05);
+                        background-image: repeating-linear-gradient(45deg, rgba(239, 68, 68, 0.1) 0px, rgba(239, 68, 68, 0.1) 10px, transparent 10px, transparent 20px);
+                        border-left: 2px solid #ef4444;
+                        border-right: 2px solid #ef4444;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        overflow: hidden;
+                        z-index: 1;
+                    ">
+                        <span style="
+                            font-size: 8px;
+                            font-weight: bold;
+                            color: #b91c1c;
+                            background: white;
+                            border: 1px solid #fca5a5;
+                            padding: 1px 4px;
+                            border-radius: 3px;
+                            white-space: nowrap;
+                        ">🛑 ${label}${reasonStr}</span>
+                    </div>`;
+            }).join('');
+
             rowsHtml += `
                 <div class="timeline-row" style="height: ${Math.max(trackHeight, 44)}px;">
                     <div class="room-label-cell">
@@ -196,6 +258,7 @@ export default function CalendarPdfButton({ houses, year, month }: CalendarPdfBu
                     <div class="tracks-cell">
                         ${gridLinesHtml}
                         ${barsHtml}
+                        ${blocksHtml}
                     </div>
                 </div>`;
         });

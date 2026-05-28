@@ -19,12 +19,21 @@ type Room = {
     assignments: Assignment[];
 };
 
+type HouseBlock = {
+    id: string;
+    houseId: string;
+    startDate: Date | string;
+    endDate: Date | string;
+    reason: string | null;
+};
+
 type House = {
     id: string;
     name: string;
     address: string;
     acceptedTypes: string[];
     rooms: Room[];
+    blocks?: HouseBlock[];
 };
 
 function typeColor(type: string): string {
@@ -81,6 +90,7 @@ export default function CalendarClient({ houses }: { houses: House[] }) {
         h.rooms.map((r) => ({
             ...r,
             houseName: h.name,
+            houseBlocks: h.blocks || [],
         }))
     );
 
@@ -144,6 +154,31 @@ export default function CalendarClient({ houses }: { houses: House[] }) {
     function overlapsMonth(assignment: Assignment) {
         const start = new Date(assignment.startDate);
         const end = new Date(assignment.endDate);
+        return start <= monthEnd && end >= monthStart;
+    }
+
+    function getBlockStyle(block: HouseBlock) {
+        const start = new Date(block.startDate);
+        const end = new Date(block.endDate);
+
+        const visStart = start < monthStart ? monthStart : start;
+        const visEnd = end > monthEnd ? monthEnd : end;
+
+        const startDay = visStart.getUTCDate();
+        const endDay = visEnd.getUTCDate();
+
+        const leftPct = ((startDay - 1) / daysInMonth) * 100;
+        const widthPct = ((endDay - startDay + 1) / daysInMonth) * 100;
+
+        return {
+            left: `${leftPct}%`,
+            width: `${Math.max(widthPct, (1 / daysInMonth) * 100)}%`,
+        };
+    }
+
+    function overlapsBlockMonth(block: HouseBlock) {
+        const start = new Date(block.startDate);
+        const end = new Date(block.endDate);
         return start <= monthEnd && end >= monthStart;
     }
 
@@ -359,6 +394,37 @@ export default function CalendarClient({ houses }: { houses: House[] }) {
                                                 title={`${a.volunteer.name} (${new Date(a.startDate).toLocaleDateString(locale === 'es' ? 'es' : undefined, { timeZone: 'UTC' })} – ${new Date(a.endDate).toLocaleDateString(locale === 'es' ? 'es' : undefined, { timeZone: 'UTC' })})`}
                                             >
                                                 <span className={`cal-bar-label${useCompact ? ' compact' : ''}`}>{a.volunteer.name}</span>
+                                            </div>
+                                        );
+                                    })}
+
+                                    {/* House Block Highlights */}
+                                    {room.houseBlocks && room.houseBlocks.filter(overlapsBlockMonth).map((b) => {
+                                        const barStyle = getBlockStyle(b);
+                                        return (
+                                            <div
+                                                key={b.id}
+                                                style={{
+                                                    ...barStyle,
+                                                    position: 'absolute',
+                                                    top: 0,
+                                                    bottom: 0,
+                                                    backgroundColor: 'rgba(239, 68, 68, 0.05)',
+                                                    backgroundImage: 'repeating-linear-gradient(45deg, rgba(239, 68, 68, 0.1) 0px, rgba(239, 68, 68, 0.1) 10px, transparent 10px, transparent 20px)',
+                                                    borderLeft: '2px solid var(--danger)',
+                                                    borderRight: '2px solid var(--danger)',
+                                                    pointerEvents: 'auto',
+                                                    zIndex: 1,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    overflow: 'hidden',
+                                                }}
+                                                title={`${locale === 'es' ? 'BLOQUEADO' : 'BLOCKED'}${b.reason ? `: ${b.reason}` : ''}`}
+                                            >
+                                                <span style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--danger)', padding: '2px 6px', background: 'var(--bg-primary)', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(239,68,68,0.3)', whiteSpace: 'nowrap', opacity: 0.95, pointerEvents: 'none' }}>
+                                                    🛑 {locale === 'es' ? 'BLOQUEADO' : 'BLOCKED'}{b.reason ? `: ${b.reason}` : ''}
+                                                </span>
                                             </div>
                                         );
                                     })}
