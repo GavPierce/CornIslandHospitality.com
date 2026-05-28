@@ -144,18 +144,58 @@ export default function VolunteersClient({
             groups[gName].push(v);
         });
 
-        // Sort keys: named groups alphabetically, 'No Group' always at the end
-        return Object.keys(groups)
-            .sort((a, b) => {
-                if (a === 'No Group') return 1;
-                if (b === 'No Group') return -1;
-                return a.localeCompare(b);
-            })
-            .reduce((acc, key) => {
-                acc[key] = groups[key];
-                return acc;
-            }, {} as { [key: string]: VolunteerWithAssignments[] });
-    }, [filtered]);
+        // Sort keys: named groups alphabetically or by earliest arrival date, 'No Group' always at the end
+        const sortedKeys = Object.keys(groups).sort((a, b) => {
+            if (a === 'No Group') return 1;
+            if (b === 'No Group') return -1;
+
+            if (housingFilter === 'needs_housing') {
+                const getEarliestArrival = (groupName: string) => {
+                    const vols = groups[groupName];
+                    let earliestMs = Infinity;
+                    for (const v of vols) {
+                        if (v.arrivalDate) {
+                            const ms = new Date(v.arrivalDate).getTime();
+                            if (ms < earliestMs) {
+                                earliestMs = ms;
+                            }
+                        }
+                    }
+                    return earliestMs === Infinity ? null : earliestMs;
+                };
+
+                const dateA = getEarliestArrival(a);
+                const dateB = getEarliestArrival(b);
+
+                if (dateA !== null && dateB !== null) {
+                    return dateA - dateB;
+                }
+                if (dateA !== null) return -1;
+                if (dateB !== null) return 1;
+            }
+
+            return a.localeCompare(b);
+        });
+
+        // Construct sorted result and also sort volunteers within each group if in needs_housing tab
+        const sortedGroups: { [key: string]: VolunteerWithAssignments[] } = {};
+        for (const key of sortedKeys) {
+            let vols = groups[key];
+            if (housingFilter === 'needs_housing') {
+                vols = [...vols].sort((a, b) => {
+                    if (a.arrivalDate && b.arrivalDate) {
+                        return new Date(a.arrivalDate).getTime() - new Date(b.arrivalDate).getTime();
+                    }
+                    if (a.arrivalDate) return -1;
+                    if (b.arrivalDate) return 1;
+                    return a.name.localeCompare(b.name);
+                });
+            }
+            sortedGroups[key] = vols;
+        }
+
+        return sortedGroups;
+    }, [filtered, housingFilter]);
 
     return (
         <div className="animate-fade-in">

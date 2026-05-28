@@ -1,1 +1,2 @@
-// Moved to src/instrumentation.ts
+export { register } from './src/instrumentation';
+

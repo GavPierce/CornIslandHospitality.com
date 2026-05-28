@@ -228,7 +228,7 @@ export default function CalendarPdfButton({ houses, year, month }: CalendarPdfBu
         .legend-item { display: flex; align-items: center; gap: 5px; color: #475569; font-weight: 500; }
         .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
 
-        .timeline-container { border: 1px solid #cbd5e1; border-radius: 6px; overflow: hidden; display: flex; flexDirection: column; background: #fff; }
+        .timeline-container { border: 1px solid #cbd5e1; border-radius: 6px; display: block; overflow: visible; background: #fff; }
         
         /* Timeline Header Row */
         .timeline-header-row { display: flex; background: #f1f5f9; border-bottom: 2px solid #cbd5e1; height: 38px; position: relative; }
