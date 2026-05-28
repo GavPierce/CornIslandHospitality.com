@@ -1,6 +1,6 @@
 'use client';
 
-import { createAssignments, deleteAssignment, createHouse, createRoom, deleteHouse, deleteRoom, addHouseOwner, removeHouseOwner, updateAssignmentHospitality, reassignRoom, updateHouseAcceptedTypes, createHouseBlock, deleteHouseBlock } from '@/actions/housing';
+import { createAssignments, deleteAssignment, createHouse, createRoom, deleteHouse, deleteRoom, addHouseOwner, removeHouseOwner, updateAssignmentHospitality, reassignRoom, updateHouseAcceptedTypes, createHouseBlock, deleteHouseBlock, createIndividualAssignments } from '@/actions/housing';
 import type { UserRole } from '@/lib/auth';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { useState, useEffect, useRef } from 'react';
@@ -80,6 +80,7 @@ export default function PlanningClient({ houses, volunteers, role }: { houses: H
     const [editTagsOpen, setEditTagsOpen] = useState<string | null>(null);
     const [editTagsValue, setEditTagsValue] = useState<Record<string, string[]>>({});
     const [blockFormOpen, setBlockFormOpen] = useState<string | null>(null);
+    const [assignIndividually, setAssignIndividually] = useState(false);
 
     const searchParams = useSearchParams();
     const groupParam = searchParams.get('group');
@@ -127,6 +128,19 @@ export default function PlanningClient({ houses, volunteers, role }: { houses: H
             const form = document.getElementById('assignment-form') as HTMLFormElement;
             if (form) form.reset();
             setVolunteerSearch(''); setSelectedVolunteerIds(new Set());
+        }
+    }
+
+    async function handleIndividualAssign(formData: FormData) {
+        setError(''); setSuccess('');
+        const result = await createIndividualAssignments(formData);
+        if (result?.error) { setError(result.error); }
+        else {
+            setSuccess(t.planning.assignmentSuccess);
+            const form = document.getElementById('assignment-form') as HTMLFormElement;
+            if (form) form.reset();
+            setVolunteerSearch(''); setSelectedVolunteerIds(new Set());
+            setAssignIndividually(false);
         }
     }
 
@@ -298,29 +312,67 @@ export default function PlanningClient({ houses, volunteers, role }: { houses: H
                         {selectedVolunteerIds.size > 0 && (
                             <>
                                 <div className="plan-divider" />
-                                <div className="plan-selected-bar">
-                                    <span>{selectedVolunteerIds.size} selected</span>
-                                    <button type="button" onClick={() => setSelectedVolunteerIds(new Set())}>Clear</button>
+                                <div className="plan-selected-bar" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                                        <span>{selectedVolunteerIds.size} selected</span>
+                                        <button type="button" onClick={() => setSelectedVolunteerIds(new Set())}>Clear</button>
+                                    </div>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8rem', cursor: 'pointer', fontWeight: 'normal', color: 'var(--text-secondary)', marginTop: 4 }}>
+                                        <input type="checkbox" checked={assignIndividually} onChange={(e) => setAssignIndividually(e.target.checked)} style={{ margin: 0 }} />
+                                        <span>Assign different rooms</span>
+                                    </label>
                                 </div>
-                                <form action={handleAssign} id="assignment-form">
+                                <form action={assignIndividually ? handleIndividualAssign : handleAssign} id="assignment-form">
                                     {Array.from(selectedVolunteerIds).map(id => (
                                         <input key={id} type="hidden" name="volunteerIds" value={id} />
                                     ))}
-                                    <div className="form-group">
-                                        <label>{t.planning.room}</label>
-                                        <select name="roomId" required style={{ padding: '8px 10px', fontSize: '0.82rem' }}>
-                                            <option value="">{t.planning.selectRoom}</option>
-                                            {houses.map(h => (
-                                                <optgroup key={h.id} label={h.name}>
-                                                    {h.rooms.map(r => {
-                                                        const allM = r.assignments.length > 0 && r.assignments.every(a => a.volunteer.type === 'MARRIED_COUPLE');
-                                                        const cap = allM ? Math.max(r.capacity, 2) : r.capacity;
-                                                        return <option key={r.id} value={r.id}>{r.name} ({r.assignments.length}/{cap})</option>;
-                                                    })}
-                                                </optgroup>
-                                            ))}
-                                        </select>
-                                    </div>
+                                    {!assignIndividually ? (
+                                        <div className="form-group">
+                                            <label>{t.planning.room}</label>
+                                            <select name="roomId" required style={{ padding: '8px 10px', fontSize: '0.82rem' }}>
+                                                <option value="">{t.planning.selectRoom}</option>
+                                                {houses.map(h => (
+                                                    <optgroup key={h.id} label={h.name}>
+                                                        {h.rooms.map(r => {
+                                                            const allM = r.assignments.length > 0 && r.assignments.every(a => a.volunteer.type === 'MARRIED_COUPLE');
+                                                            const cap = allM ? Math.max(r.capacity, 2) : r.capacity;
+                                                            return <option key={r.id} value={r.id}>{r.name} ({r.assignments.length}/{cap})</option>;
+                                                        })}
+                                                    </optgroup>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    ) : (
+                                        <div className="form-group">
+                                            <label>Individual Room Assignment</label>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4, maxHeight: '200px', overflowY: 'auto', paddingRight: 4 }}>
+                                                {Array.from(selectedVolunteerIds).map(id => {
+                                                    const v = volunteers.find(vol => vol.id === id);
+                                                    if (!v) return null;
+                                                    return (
+                                                        <div key={id} style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '8px 10px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                                <span style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)' }}>{v.name}</span>
+                                                                <span className={typeBadgeClass(v.type)} style={{ fontSize: '0.65rem' }}>{typeLabel(v.type)}</span>
+                                                            </div>
+                                                            <select name={`roomId_${id}`} required style={{ padding: '4px 8px', fontSize: '0.78rem', width: '100%', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
+                                                                <option value="">{t.planning.selectRoom}</option>
+                                                                {houses.map(h => (
+                                                                    <optgroup key={h.id} label={h.name}>
+                                                                        {h.rooms.map(r => {
+                                                                            const allM = r.assignments.length > 0 && r.assignments.every(a => a.volunteer.type === 'MARRIED_COUPLE');
+                                                                            const cap = allM ? Math.max(r.capacity, 2) : r.capacity;
+                                                                            return <option key={r.id} value={r.id}>{r.name} ({r.assignments.length}/{cap})</option>;
+                                                                        })}
+                                                                    </optgroup>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
                                     <div style={{ display: 'flex', gap: 8 }}>
                                         <div className="form-group" style={{ flex: 1 }}>
                                             <label>{t.planning.startDate}</label>

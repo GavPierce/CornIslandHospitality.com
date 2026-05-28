@@ -467,6 +467,146 @@ export async function createAssignments(formData: FormData) {
     return { success: true };
 }
 
+export async function createIndividualAssignments(formData: FormData) {
+    const authError = await requireElevatedAccess();
+    if (authError) return { error: authError };
+
+    const volunteerIds = formData.getAll('volunteerIds') as string[];
+    const startDate = new Date(formData.get('startDate') as string);
+    const endDate = new Date(formData.get('endDate') as string);
+    const hospitalityMemberId = (formData.get('hospitalityMemberId') as string | null) || null;
+
+    if (volunteerIds.length === 0 || isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        return { error: 'All fields are required.' };
+    }
+
+    if (endDate <= startDate) {
+        return { error: 'End date must be after start date.' };
+    }
+
+    const assignmentsToCreate: { volunteerId: string; roomId: string }[] = [];
+    for (const vId of volunteerIds) {
+        const rId = formData.get(`roomId_${vId}`) as string;
+        if (rId) {
+            assignmentsToCreate.push({ volunteerId: vId, roomId: rId });
+        }
+    }
+
+    if (assignmentsToCreate.length === 0) {
+        return { error: 'Please select a room for at least one volunteer.' };
+    }
+
+    const roomIds = Array.from(new Set(assignmentsToCreate.map(a => a.roomId)));
+    const rooms = await prisma.room.findMany({
+        where: { id: { in: roomIds } },
+        include: { house: true },
+    });
+    const roomsMap = new Map(rooms.map(r => [r.id, r]));
+
+    const volunteers = await prisma.volunteer.findMany({
+        where: { id: { in: volunteerIds } },
+    });
+    const volunteersMap = new Map(volunteers.map(v => [v.id, v]));
+
+    const houseIds = Array.from(new Set(rooms.map(r => r.houseId)));
+    const activeBlocks = await prisma.houseBlock.findMany({
+        where: {
+            houseId: { in: houseIds },
+            startDate: { lt: endDate },
+            endDate: { gt: startDate },
+        },
+    });
+    const blockedHouseIds = new Set(activeBlocks.map(b => b.houseId));
+
+    for (const item of assignmentsToCreate) {
+        const v = volunteersMap.get(item.volunteerId);
+        const r = roomsMap.get(item.roomId);
+        if (!v || !r) return { error: 'Invalid volunteer or room selected.' };
+
+        if (!r.house.acceptedTypes.includes(v.type)) {
+            return { error: `House '${r.house.name}' does not accept ${v.type.replace(/_/g, ' ').toLowerCase()}s (${v.name}).` };
+        }
+
+        if (blockedHouseIds.has(r.houseId)) {
+            return { error: `House '${r.house.name}' is blocked during this period.` };
+        }
+    }
+
+    const byRoom: Record<string, typeof assignmentsToCreate> = {};
+    for (const item of assignmentsToCreate) {
+        if (!byRoom[item.roomId]) byRoom[item.roomId] = [];
+        byRoom[item.roomId].push(item);
+    }
+
+    for (const rId of Object.keys(byRoom)) {
+        const room = roomsMap.get(rId)!;
+        const items = byRoom[rId];
+        const volsInThisRoom = items.map(item => volunteersMap.get(item.volunteerId)!);
+
+        const existingAssignments = await prisma.assignment.findMany({
+            where: {
+                roomId: rId,
+                startDate: { lt: endDate },
+                endDate: { gt: startDate },
+            },
+            include: { volunteer: true },
+        });
+
+        const conflictingTypes = new Set(existingAssignments.map((a) => a.volunteer.type));
+        for (const v of volsInThisRoom) {
+            conflictingTypes.add(v.type);
+        }
+
+        if (conflictingTypes.has('SINGLE_BROTHER') && conflictingTypes.has('SINGLE_SISTER') && !conflictingTypes.has('MARRIED_COUPLE')) {
+            return { error: `Gender conflict in room '${room.name}' (${room.house.name}): Single brothers and single sisters cannot share the same room unless a married couple is present.` };
+        }
+
+        const allMarried =
+            volsInThisRoom.every((v) => v.type === 'MARRIED_COUPLE') &&
+            existingAssignments.every((a) => a.volunteer.type === 'MARRIED_COUPLE');
+        const effectiveCapacity = allMarried ? Math.max(room.capacity, 2) : room.capacity;
+
+        if (existingAssignments.length + volsInThisRoom.length > effectiveCapacity) {
+            return { error: `Room '${room.name}' (${room.house.name}) does not have enough capacity.` };
+        }
+    }
+
+    const volunteerOverlaps = await prisma.assignment.findMany({
+        where: {
+            volunteerId: { in: volunteerIds },
+            startDate: { lt: endDate },
+            endDate: { gt: startDate },
+        },
+        include: { volunteer: true },
+    });
+
+    if (volunteerOverlaps.length > 0) {
+        const overlappedNames = Array.from(new Set(volunteerOverlaps.map(o => o.volunteer.name))).join(', ');
+        return { error: `The following volunteers are already assigned during the selected dates: ${overlappedNames}` };
+    }
+
+    const newAssignments = await prisma.$transaction(
+        assignmentsToCreate.map(item => prisma.assignment.create({
+            data: {
+                volunteerId: item.volunteerId,
+                roomId: item.roomId,
+                startDate,
+                endDate,
+                ...(hospitalityMemberId ? { hospitalityMemberId } : {}),
+            }
+        }))
+    );
+
+    for (const a of newAssignments) {
+        sendAssignmentConfirmation(a.id).catch((err) =>
+            console.error('[createIndividualAssignments] confirmation send failed', err)
+        );
+    }
+
+    revalidatePath('/planning');
+    return { success: true };
+}
+
 /**
  * Change (or clear) the hospitality member for an existing assignment.
  * Sends a cancellation to the old member (if any) and a pairing
