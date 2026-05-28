@@ -1,6 +1,6 @@
 'use client';
 
-import { createAssignments, deleteAssignment, createHouse, createRoom, deleteHouse, deleteRoom, addHouseOwner, removeHouseOwner, updateAssignmentHospitality, reassignRoom, updateHouseAcceptedTypes, createHouseBlock, deleteHouseBlock, createIndividualAssignments } from '@/actions/housing';
+import { createAssignments, deleteAssignment, createHouse, createRoom, deleteHouse, deleteRoom, addHouseOwner, removeHouseOwner, updateAssignmentHospitality, reassignRoom, updateHouseAcceptedTypes, createHouseBlock, deleteHouseBlock, createIndividualAssignments, updateRoom } from '@/actions/housing';
 import type { UserRole } from '@/lib/auth';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { useState, useEffect, useRef } from 'react';
@@ -48,6 +48,8 @@ type Volunteer = {
     isHospitality: boolean;
     isLocal: boolean;
     groupName: string | null;
+    arrivalDate?: Date | string | null;
+    departureDate?: Date | string | null;
     assignments: { id: string; room: { name: string; house: { name: string } } }[];
 };
 
@@ -81,6 +83,11 @@ export default function PlanningClient({ houses, volunteers, role }: { houses: H
     const [editTagsValue, setEditTagsValue] = useState<Record<string, string[]>>({});
     const [blockFormOpen, setBlockFormOpen] = useState<string | null>(null);
     const [assignIndividually, setAssignIndividually] = useState(false);
+    const [bookingStartDate, setBookingStartDate] = useState('');
+    const [bookingEndDate, setBookingEndDate] = useState('');
+    const [editRoomId, setEditRoomId] = useState<string | null>(null);
+    const [editRoomName, setEditRoomName] = useState('');
+    const [editRoomCapacity, setEditRoomCapacity] = useState<number>(0);
 
     const searchParams = useSearchParams();
     const groupParam = searchParams.get('group');
@@ -96,6 +103,36 @@ export default function PlanningClient({ houses, volunteers, role }: { houses: H
             }
         }
     }, [groupParam, volunteers]);
+
+    useEffect(() => {
+        if (selectedVolunteerIds.size === 1) {
+            const firstId = Array.from(selectedVolunteerIds)[0];
+            const vol = volunteers.find(v => v.id === firstId);
+            if (vol) {
+                if (vol.arrivalDate) {
+                    const d = new Date(vol.arrivalDate);
+                    const yr = d.getUTCFullYear();
+                    const mo = String(d.getUTCMonth() + 1).padStart(2, '0');
+                    const da = String(d.getUTCDate()).padStart(2, '0');
+                    setBookingStartDate(`${yr}-${mo}-${da}`);
+                } else {
+                    setBookingStartDate('');
+                }
+                if (vol.departureDate) {
+                    const d = new Date(vol.departureDate);
+                    const yr = d.getUTCFullYear();
+                    const mo = String(d.getUTCMonth() + 1).padStart(2, '0');
+                    const da = String(d.getUTCDate()).padStart(2, '0');
+                    setBookingEndDate(`${yr}-${mo}-${da}`);
+                } else {
+                    setBookingEndDate('');
+                }
+            }
+        } else if (selectedVolunteerIds.size === 0) {
+            setBookingStartDate('');
+            setBookingEndDate('');
+        }
+    }, [selectedVolunteerIds, volunteers]);
 
     const hospitalityMembers = volunteers.filter((v) => v.isHospitality);
     const unassignedCount = volunteers.filter((v) => v.assignments.length === 0).length;
@@ -373,14 +410,14 @@ export default function PlanningClient({ houses, volunteers, role }: { houses: H
                                             </div>
                                         </div>
                                     )}
-                                    <div style={{ display: 'flex', gap: 8 }}>
-                                        <div className="form-group" style={{ flex: 1 }}>
+                                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                        <div className="form-group" style={{ flex: '1 1 120px' }}>
                                             <label>{t.planning.startDate}</label>
-                                            <input name="startDate" type="date" required style={{ padding: '8px 10px', fontSize: '0.82rem' }} />
+                                            <input name="startDate" type="date" required value={bookingStartDate} onChange={(e) => setBookingStartDate(e.target.value)} style={{ padding: '8px 10px', fontSize: '0.82rem', width: '100%', boxSizing: 'border-box' }} />
                                         </div>
-                                        <div className="form-group" style={{ flex: 1 }}>
+                                        <div className="form-group" style={{ flex: '1 1 120px' }}>
                                             <label>{t.planning.endDate}</label>
-                                            <input name="endDate" type="date" required style={{ padding: '8px 10px', fontSize: '0.82rem' }} />
+                                            <input name="endDate" type="date" required value={bookingEndDate} onChange={(e) => setBookingEndDate(e.target.value)} style={{ padding: '8px 10px', fontSize: '0.82rem', width: '100%', boxSizing: 'border-box' }} />
                                         </div>
                                     </div>
                                     {hospitalityMembers.length > 0 && (
@@ -556,12 +593,49 @@ export default function PlanningClient({ houses, volunteers, role }: { houses: H
                                                     const fillClass = pct >= 100 ? 'full' : pct >= 50 ? 'mid' : 'low';
                                                     return (
                                                         <div key={room.id} className="plan-room-block">
-                                                            <div className="plan-room-header">
-                                                                <span className="room-name">{room.name}</span>
-                                                                <span className="room-occupancy">{room.assignments.length}/{room.capacity}</span>
-                                                                <div className="occupancy-bar"><div className={`fill ${fillClass}`} style={{ width: `${Math.min(pct, 100)}%` }} /></div>
-                                                                {isAdmin && <button className="plan-action-btn danger" onClick={() => deleteRoom(room.id)}>✕</button>}
-                                                            </div>
+                                                            {isAdmin && editRoomId === room.id ? (
+                                                                <div className="plan-room-header" style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '4px 8px' }}>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={editRoomName}
+                                                                        onChange={(e) => setEditRoomName(e.target.value)}
+                                                                        style={{ padding: '3px 6px', fontSize: '0.8rem', flex: 2, background: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)' }}
+                                                                        placeholder="Room Name"
+                                                                        required
+                                                                    />
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1 }}>
+                                                                        <input
+                                                                            type="number"
+                                                                            value={editRoomCapacity}
+                                                                            onChange={(e) => setEditRoomCapacity(parseInt(e.target.value, 10) || 0)}
+                                                                            style={{ padding: '3px 6px', fontSize: '0.8rem', width: '50px', background: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)' }}
+                                                                            min={1}
+                                                                            required
+                                                                        />
+                                                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>beds</span>
+                                                                    </div>
+                                                                    <button className="btn btn-primary btn-sm" style={{ padding: '2px 6px', fontSize: '0.7rem' }}
+                                                                        onClick={async () => {
+                                                                            const res = await updateRoom(room.id, editRoomName, editRoomCapacity);
+                                                                            if (res?.error) setError(res.error);
+                                                                            else setEditRoomId(null);
+                                                                        }}
+                                                                    >Save</button>
+                                                                    <button className="plan-action-btn" onClick={() => setEditRoomId(null)}>✕</button>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="plan-room-header">
+                                                                    <span className="room-name">{room.name}</span>
+                                                                    <span className="room-occupancy">{room.assignments.length}/{room.capacity}</span>
+                                                                    <div className="occupancy-bar"><div className={`fill ${fillClass}`} style={{ width: `${Math.min(pct, 100)}%` }} /></div>
+                                                                    {isAdmin && (
+                                                                        <div style={{ display: 'flex', gap: 4 }}>
+                                                                            <button className="plan-action-btn" onClick={() => { setEditRoomId(room.id); setEditRoomName(room.name); setEditRoomCapacity(room.capacity); }} title="Edit room" style={{ cursor: 'pointer' }}>✎</button>
+                                                                            <button className="plan-action-btn danger" onClick={() => deleteRoom(room.id)} title="Delete room">✕</button>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )}
                                                             {room.assignments.length === 0 && <div className="plan-empty-room">No current assignments</div>}
                                                             {room.assignments.map((a) => (
                                                                 <div key={a.id}>

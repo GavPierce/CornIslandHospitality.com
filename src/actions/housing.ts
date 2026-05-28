@@ -203,6 +203,24 @@ export async function createRoom(formData: FormData) {
     return { success: true };
 }
 
+export async function updateRoom(roomId: string, name: string, capacity: number) {
+    const authError = await requireElevatedAccess();
+    if (authError) return { error: authError };
+
+    if (!roomId || !name || capacity <= 0) {
+        return { error: 'Invalid room name or capacity.' };
+    }
+
+    await prisma.room.update({
+        where: { id: roomId },
+        data: { name, capacity },
+    });
+
+    revalidatePath('/');
+    revalidatePath('/planning');
+    return { success: true };
+}
+
 export async function deleteRoom(id: string) {
     const authError = await requireElevatedAccess();
     if (authError) return { error: authError };
