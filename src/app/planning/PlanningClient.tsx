@@ -1,6 +1,6 @@
 'use client';
 
-import { createAssignments, deleteAssignment, createHouse, createRoom, deleteHouse, deleteRoom, addHouseOwner, removeHouseOwner, updateAssignmentHospitality, reassignRoom, updateHouseAcceptedTypes, createHouseBlock, deleteHouseBlock, createIndividualAssignments, updateRoom } from '@/actions/housing';
+import { createAssignments, deleteAssignment, createHouse, createRoom, deleteHouse, deleteRoom, addHouseOwner, removeHouseOwner, updateAssignmentHospitality, reassignRoom, updateHouseAcceptedTypes, createHouseBlock, deleteHouseBlock, createIndividualAssignments, updateRoom, updateAssignmentDates } from '@/actions/housing';
 import type { UserRole } from '@/lib/auth';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { useState, useEffect, useRef } from 'react';
@@ -88,6 +88,10 @@ export default function PlanningClient({ houses, volunteers, role }: { houses: H
     const [editRoomId, setEditRoomId] = useState<string | null>(null);
     const [editRoomName, setEditRoomName] = useState('');
     const [editRoomCapacity, setEditRoomCapacity] = useState<number>(0);
+
+    const [datesPickerOpen, setDatesPickerOpen] = useState<string | null>(null);
+    const [datesPickerStart, setDatesPickerValueStart] = useState<Record<string, string>>({});
+    const [datesPickerEnd, setDatesPickerValueEnd] = useState<Record<string, string>>({});
 
     const searchParams = useSearchParams();
     const groupParam = searchParams.get('group');
@@ -650,8 +654,9 @@ export default function PlanningClient({ houses, volunteers, role }: { houses: H
                                                                         </div>
                                                                         {isAdmin && (
                                                                             <div className="plan-assignment-actions">
-                                                                                <button className="plan-action-btn hosp" title="Hospitality" onClick={() => { setHospPickerOpen(hospPickerOpen === a.id ? null : a.id); setMovePickerOpen(null); }}>🤝</button>
-                                                                                <button className="plan-action-btn move" title="Move" onClick={() => { setMovePickerOpen(movePickerOpen === a.id ? null : a.id); setHospPickerOpen(null); }}>🔄</button>
+                                                                                <button className="plan-action-btn hosp" title="Hospitality" onClick={() => { setHospPickerOpen(hospPickerOpen === a.id ? null : a.id); setMovePickerOpen(null); setDatesPickerOpen(null); }}>🤝</button>
+                                                                                <button className="plan-action-btn move" title="Move" onClick={() => { setMovePickerOpen(movePickerOpen === a.id ? null : a.id); setHospPickerOpen(null); setDatesPickerOpen(null); }}>🔄</button>
+                                                                                <button className="plan-action-btn dates" title={t.planning.changeDates} onClick={() => { setDatesPickerOpen(datesPickerOpen === a.id ? null : a.id); setHospPickerOpen(null); setMovePickerOpen(null); }}>📅</button>
                                                                                 <button className="plan-action-btn danger" title="Remove" onClick={() => deleteAssignment(a.id)}>✕</button>
                                                                             </div>
                                                                         )}
@@ -685,6 +690,45 @@ export default function PlanningClient({ houses, volunteers, role }: { houses: H
                                                                                     setMovePickerOpen(null); setMovePickerValue(p => ({ ...p, [a.id]: '' }));
                                                                                 }}>Move</button>
                                                                             <button className="plan-action-btn" onClick={() => setMovePickerOpen(null)}>Cancel</button>
+                                                                        </div>
+                                                                    )}
+                                                                    {datesPickerOpen === a.id && (
+                                                                        <div className="plan-inline-picker" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '8px' }}>
+                                                                            <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+                                                                                <div style={{ flex: 1 }}>
+                                                                                    <label style={{ fontSize: '0.68rem', display: 'block', marginBottom: '2px', color: 'var(--text-muted)' }}>{t.planning.startDate}</label>
+                                                                                    <input
+                                                                                        type="date"
+                                                                                        style={{ width: '100%', padding: '4px 8px', fontSize: '0.78rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+                                                                                        value={datesPickerStart[a.id] ?? new Date(a.startDate).toISOString().split('T')[0]}
+                                                                                        onChange={(e) => setDatesPickerValueStart(p => ({ ...p, [a.id]: e.target.value }))}
+                                                                                    />
+                                                                                </div>
+                                                                                <div style={{ flex: 1 }}>
+                                                                                    <label style={{ fontSize: '0.68rem', display: 'block', marginBottom: '2px', color: 'var(--text-muted)' }}>{t.planning.endDate}</label>
+                                                                                    <input
+                                                                                        type="date"
+                                                                                        style={{ width: '100%', padding: '4px 8px', fontSize: '0.78rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+                                                                                        value={datesPickerEnd[a.id] ?? new Date(a.endDate).toISOString().split('T')[0]}
+                                                                                        onChange={(e) => setDatesPickerValueEnd(p => ({ ...p, [a.id]: e.target.value }))}
+                                                                                    />
+                                                                                </div>
+                                                                            </div>
+                                                                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                                                                                <button className="btn btn-primary btn-sm" style={{ padding: '3px 8px', fontSize: '0.72rem' }}
+                                                                                    onClick={async () => {
+                                                                                        const start = datesPickerStart[a.id] ?? new Date(a.startDate).toISOString().split('T')[0];
+                                                                                        const end = datesPickerEnd[a.id] ?? new Date(a.endDate).toISOString().split('T')[0];
+                                                                                        const res = await updateAssignmentDates(a.id, start, end);
+                                                                                        if (res?.error) {
+                                                                                            setError(res.error);
+                                                                                        } else {
+                                                                                            setSuccess('Assignment dates updated.');
+                                                                                            setDatesPickerOpen(null);
+                                                                                        }
+                                                                                    }}>Save</button>
+                                                                                <button className="plan-action-btn" onClick={() => setDatesPickerOpen(null)}>Cancel</button>
+                                                                            </div>
                                                                         </div>
                                                                     )}
                                                                 </div>

@@ -123,6 +123,7 @@ const es: Translations = {
     blockReason: 'Motivo (opcional)',
     addBlock: 'Bloquear Casa',
     deleteBlock: 'Eliminar Bloqueo',
+    changeDates: 'Cambiar Fechas',
   },
 
   // Calendar

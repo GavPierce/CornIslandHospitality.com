@@ -4,7 +4,7 @@ import { requireElevatedAccess } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { VolunteerType, Language, ArrivalTransport } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
-import { sendAssignmentConfirmation, sendHospitalityPairingNotification, sendHospitalityCancellationNotification, sendRoomReassignmentNotification } from '@/lib/reminders';
+import { sendAssignmentConfirmation, sendHospitalityPairingNotification, sendHospitalityCancellationNotification, sendRoomReassignmentNotification, sendAssignmentDatesChangedNotification } from '@/lib/reminders';
 
 // ─── Houses ──────────────────────────────────────────
 
@@ -800,3 +800,145 @@ export async function reassignRoom(
     revalidatePath('/planning');
     return { success: true };
 }
+
+/**
+ * Change the dates of an existing assignment, checking house blocks,
+ * capacity, gender restrictions, and overlapping volunteer schedules.
+ * Then sends WhatsApp notification to volunteer and house owners.
+ */
+export async function updateAssignmentDates(
+    assignmentId: string,
+    startDateStr: string,
+    endDateStr: string,
+) {
+    const authError = await requireElevatedAccess();
+    if (authError) return { error: authError };
+
+    if (!assignmentId || !startDateStr || !endDateStr) {
+        return { error: 'All fields are required.' };
+    }
+
+    const startDate = new Date(startDateStr);
+    const endDate = new Date(endDateStr);
+
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        return { error: 'Invalid dates.' };
+    }
+
+    if (endDate <= startDate) {
+        return { error: 'End date must be after start date.' };
+    }
+
+    const assignment = await prisma.assignment.findUnique({
+        where: { id: assignmentId },
+        include: {
+            volunteer: { select: { id: true, name: true, phone: true, language: true, type: true } },
+            room: {
+                include: {
+                    house: {
+                        include: {
+                            owners: {
+                                include: {
+                                    volunteer: { select: { name: true, phone: true, language: true } },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    });
+
+    if (!assignment) return { error: 'Assignment not found.' };
+
+    const volunteer = assignment.volunteer as unknown as {
+        id: string; name: string; phone: string | null; language: Language | null; type: VolunteerType;
+    };
+
+    // 1. Check House Blocks for the target house
+    const activeBlock = await prisma.houseBlock.findFirst({
+        where: {
+            houseId: assignment.room.houseId,
+            startDate: { lt: endDate },
+            endDate: { gt: startDate },
+        },
+    });
+
+    if (activeBlock) {
+        const reasonStr = activeBlock.reason ? ` (${activeBlock.reason})` : '';
+        const startFmt = activeBlock.startDate.toLocaleDateString(undefined, { timeZone: 'UTC' });
+        const endFmt = activeBlock.endDate.toLocaleDateString(undefined, { timeZone: 'UTC' });
+        return { error: `Cannot change dates: this house is blocked from ${startFmt} to ${endFmt}${reasonStr}.` };
+    }
+
+    // 2. Check room capacity and gender conflict for other assignments in the SAME room during the NEW date range
+    const otherAssignments = await prisma.assignment.findMany({
+        where: {
+            roomId: assignment.roomId,
+            id: { not: assignmentId },
+            startDate: { lt: endDate },
+            endDate: { gt: startDate },
+        },
+        include: { volunteer: { select: { type: true } } },
+    });
+
+    const conflictingTypes = new Set(otherAssignments.map((a) => a.volunteer.type));
+    conflictingTypes.add(volunteer.type);
+
+    if (conflictingTypes.has('SINGLE_BROTHER') && conflictingTypes.has('SINGLE_SISTER') && !conflictingTypes.has('MARRIED_COUPLE')) {
+        return { error: 'Single brothers and single sisters cannot share the same room unless a married couple is present.' };
+    }
+
+    const allMarried =
+        volunteer.type === 'MARRIED_COUPLE' &&
+        otherAssignments.every((a) => a.volunteer.type === 'MARRIED_COUPLE');
+    const effectiveCapacity = allMarried ? Math.max(assignment.room.capacity, 2) : assignment.room.capacity;
+
+    if (otherAssignments.length + 1 > effectiveCapacity) {
+        return { error: 'This room does not have enough capacity for the selected dates.' };
+    }
+
+    // 3. Check overlapping assignments for the SAME volunteer (except the current one we are updating)
+    const volunteerOverlaps = await prisma.assignment.findMany({
+        where: {
+            volunteerId: volunteer.id,
+            id: { not: assignmentId },
+            startDate: { lt: endDate },
+            endDate: { gt: startDate },
+        },
+        include: { room: { include: { house: { select: { name: true } } } } },
+    });
+
+    if (volunteerOverlaps.length > 0) {
+        const conflictStr = volunteerOverlaps.map(o => `${o.room.house.name} (${o.room.name})`).join(', ');
+        return { error: `Volunteer is already assigned during these dates to: ${conflictStr}` };
+    }
+
+    const oldStartDate = assignment.startDate;
+    const oldEndDate = assignment.endDate;
+
+    // 4. Update dates
+    await prisma.assignment.update({
+        where: { id: assignmentId },
+        data: { startDate, endDate },
+    });
+
+    // 5. Notify volunteer and house owners of the updated dates
+    sendAssignmentDatesChangedNotification({
+        volunteerName: volunteer.name,
+        volunteerPhone: volunteer.phone,
+        volunteerLang: volunteer.language,
+        houseName: assignment.room.house.name,
+        roomName: assignment.room.name,
+        oldStartDate,
+        oldEndDate,
+        newStartDate: startDate,
+        newEndDate: endDate,
+        houseOwners: assignment.room.house.owners.map((o) => o.volunteer),
+    }).catch((err) => console.error('[updateAssignmentDates] notification failed', err));
+
+    revalidatePath('/');
+    revalidatePath('/planning');
+    return { success: true };
+}
+

@@ -1086,6 +1086,60 @@ export async function sendRoomReassignmentNotification(params: {
     }
 }
 
+/**
+ * Uses sendWhatsAppText directly (no ReminderLog) to notify the volunteer
+ * and the house owners of updated stay dates.
+ */
+export async function sendAssignmentDatesChangedNotification(params: {
+    volunteerName: string;
+    volunteerPhone: string | null;
+    volunteerLang: Language | null;
+    houseName: string;
+    roomName: string;
+    oldStartDate: Date;
+    oldEndDate: Date;
+    newStartDate: Date;
+    newEndDate: Date;
+    houseOwners: Array<{ name: string; phone: string | null; language: Language | null }>;
+}): Promise<void> {
+    const {
+        volunteerName, volunteerPhone, volunteerLang,
+        houseName, roomName,
+        oldStartDate, oldEndDate,
+        newStartDate, newEndDate,
+        houseOwners,
+    } = params;
+
+    await ensureWhatsAppStarted();
+
+    // ── Volunteer ──────────────────────────────────────────────────
+    if (volunteerPhone) {
+        const lang = volunteerLang ?? DEFAULT_LANG;
+        const oldFrom = formatLongDate(oldStartDate, lang);
+        const oldTo = formatLongDate(oldEndDate, lang);
+        const newFrom = formatLongDate(newStartDate, lang);
+        const newTo = formatLongDate(newEndDate, lang);
+        const text = lang === 'ES'
+            ? `🔄 *Cambio de fechas de alojamiento — Hola ${volunteerName}!*\n\nTu estadía en *${houseName}* — *${roomName}* ha sido modificada.\n\n*Anterior:* ${oldFrom} → ${oldTo}\n*Nuevo:* ${newFrom} → ${newTo}\n\nSi tienes preguntas, comunícate con tu coordinador.\n— Corn Island Hospitality`
+            : `🔄 *Housing dates updated — Hi ${volunteerName}!*\n\nYour stay dates at *${houseName}* — *${roomName}* have been updated.\n\n*Previous:* ${oldFrom} → ${oldTo}\n*New:* ${newFrom} → ${newTo}\n\nIf you have questions, reach out to your coordinator.\n— Corn Island Hospitality`;
+        await sendWhatsAppText(volunteerPhone, text);
+    }
+
+    // ── House owners ───────────────────────────────────────────────
+    for (const owner of houseOwners) {
+        if (!owner.phone) continue;
+        const lang = owner.language ?? DEFAULT_LANG;
+        const oldFrom = formatLongDate(oldStartDate, lang);
+        const oldTo = formatLongDate(oldEndDate, lang);
+        const newFrom = formatLongDate(newStartDate, lang);
+        const newTo = formatLongDate(newEndDate, lang);
+        const text = lang === 'ES'
+            ? `🏡 *Actualización de fechas — Hola ${owner.name}!*\n\nLas fechas de estadía para *${volunteerName}* en tu casa (*${houseName}* — *${roomName}*) han cambiado.\n\n*Anterior:* ${oldFrom} → ${oldTo}\n*Nuevo:* ${newFrom} → ${newTo}\n\n— Corn Island Hospitality`
+            : `🏡 *Dates updated — Hi ${owner.name}!*\n\nStay dates for *${volunteerName}* in your home (*${houseName}* — *${roomName}*) have changed.\n\n*Previous:* ${oldFrom} → ${oldTo}\n*New:* ${newFrom} → ${newTo}\n\n— Corn Island Hospitality`;
+        await sendWhatsAppText(owner.phone, text);
+    }
+}
+
 export type ReminderRunSummary = {
     date: string;
     sent: number;

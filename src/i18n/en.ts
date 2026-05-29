@@ -115,6 +115,7 @@ export type Translations = {
     blockReason: string;
     addBlock: string;
     deleteBlock: string;
+    changeDates: string;
   };
   calendar: {
     title: string;
@@ -319,6 +320,7 @@ const en: Translations = {
     blockReason: 'Reason (optional)',
     addBlock: 'Block House',
     deleteBlock: 'Remove Block',
+    changeDates: 'Change Dates',
   },
   calendar: {
     title: 'Calendar',
