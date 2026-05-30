@@ -1967,7 +1967,22 @@ h6 {
     display: none !important;
   }
 
+  /* Ensure block level layout and page scrolling on print (fixes multi-page pagination cutoffs) */
+  body,
+  html,
+  .app-shell,
   .main-content {
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+  }
+
+  .app-shell {
+    display: block !important;
+  }
+
+  .main-content {
+    display: block !important;
     margin-left: 0 !important;
     padding: 0 !important;
   }
@@ -1980,11 +1995,13 @@ h6 {
     print-color-adjust: exact;
   }
 
-  .glass-panel {
+  .glass-panel,
+  .data-table-wrapper {
     background: white !important;
     border: 1px solid #ddd !important;
     box-shadow: none !important;
     backdrop-filter: none !important;
+    overflow: visible !important;
   }
 
   .page-header h1 {
@@ -1995,15 +2012,29 @@ h6 {
     color: #555 !important;
   }
 
+  /* Override nowrap mobile styling and prevent horizontal clipping */
+  .data-table,
+  .data-table th,
+  .data-table td {
+    white-space: normal !important;
+    word-break: break-word !important;
+  }
+
   .data-table th {
     background: #f5f5f5 !important;
     color: #333 !important;
     border-bottom: 2px solid #999 !important;
+    padding: 10px 12px !important;
   }
 
   .data-table td {
     color: #333 !important;
     border-bottom: 1px solid #ddd !important;
+    padding: 10px 12px !important;
+  }
+
+  .data-table tr {
+    break-inside: avoid !important; /* Prevent single row from being split across page margins */
   }
 
   .type-badge {
@@ -2015,9 +2046,9 @@ h6 {
     border-bottom: 2px solid #333 !important;
   }
 
-  /* Ensure tables don't break across pages within a group */
+  /* Allow groups to break naturally across pages if they are very long */
   .arrivals-group {
-    break-inside: avoid;
+    break-inside: auto !important;
   }
 
   /* Softer badge colors for print */

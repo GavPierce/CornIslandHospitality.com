@@ -5,21 +5,21 @@ import type { MyAssignment, MyShift } from './MyScheduleCard';
 import type { WatchShift } from './DashboardClient';
 import DashboardClient from './DashboardClient';
 import LanguagePrompt from './LanguagePrompt';
+import { todayDateOnlyInTz } from '@/lib/reminders';
 
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
+  const today = todayDateOnlyInTz();
   const volunteerCount = await prisma.volunteer.count();
   const assignmentCount = await prisma.assignment.count({
-    where: { endDate: { gte: new Date() } },
+    where: { endDate: { gte: today } },
   });
   const houseCount = await prisma.house.count();
   const role = await getUserRole();
   const session = await getCurrentUser();
 
   // ─── Night Watchman schedule (next 7 days) ────────────────
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
   const weekEnd = new Date(today);
   weekEnd.setUTCDate(weekEnd.getUTCDate() + 7);
 
@@ -74,7 +74,7 @@ export default async function DashboardPage() {
     }));
 
     const assignmentRows = await prisma.assignment.findMany({
-      where: { volunteerId: session.identityId, endDate: { gte: new Date() } },
+      where: { volunteerId: session.identityId, endDate: { gte: today } },
       include: {
         room: { include: { house: true } },
         hospitalityMember: { select: { name: true, phone: true } },

@@ -4,11 +4,12 @@ import { requireElevatedAccess } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { VolunteerType, Language, ArrivalTransport } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
-import { sendAssignmentConfirmation, sendHospitalityPairingNotification, sendHospitalityCancellationNotification, sendRoomReassignmentNotification, sendAssignmentDatesChangedNotification } from '@/lib/reminders';
+import { sendAssignmentConfirmation, sendHospitalityPairingNotification, sendHospitalityCancellationNotification, sendRoomReassignmentNotification, sendAssignmentDatesChangedNotification, todayDateOnlyInTz } from '@/lib/reminders';
 
 // ─── Houses ──────────────────────────────────────────
 
 export async function getHouses() {
+    const today = todayDateOnlyInTz();
     return prisma.house.findMany({
         include: {
             owners: {
@@ -27,7 +28,7 @@ export async function getHouses() {
                             },
                         },
                         where: {
-                            endDate: { gte: new Date() },
+                            endDate: { gte: today },
                         },
                     },
                 },
@@ -233,11 +234,12 @@ export async function deleteRoom(id: string) {
 // ─── Volunteers ──────────────────────────────────────
 
 export async function getVolunteers() {
+    const today = todayDateOnlyInTz();
     return prisma.volunteer.findMany({
         include: {
             assignments: {
                 include: { room: { include: { house: true } }, hospitalityMember: { select: { name: true, phone: true } } },
-                where: { endDate: { gte: new Date() } },
+                where: { endDate: { gte: today } },
             },
         },
         orderBy: { name: 'asc' },
